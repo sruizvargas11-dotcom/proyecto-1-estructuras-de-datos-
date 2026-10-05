@@ -14,7 +14,7 @@ BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1
 
 
 class DatosHTTP(FuenteDeDatos):
-    """Implementación de FuenteDeDatos que consume el API REST de CRIPTA."""
+    """Implementación de FuenteDeDatos que consume el api  de la cripta."""
 
     def __init__(self):
         self._base_url = BASE_URL
@@ -26,7 +26,7 @@ class DatosHTTP(FuenteDeDatos):
 
 
     def _get(self, ruta: str, params: dict = None) -> dict:
-        """Único punto que habla con el servidor. Todo GET pasa por aquí."""
+        """se comunica con el servidor aca pasan los gets """
         while True:
             respuesta = requests.get(
                 f"{self._base_url}{ruta}",
@@ -56,38 +56,41 @@ class DatosHTTP(FuenteDeDatos):
 
 
     def datos_cripta(self, cripta_id: str) -> dict:
-        """GET #2 — datos generales de una cripta. Fija el presupuesto de solicitudes."""
+        """GET #2 -datos generales y se tiene la cantidad de solicitudes """
         respuesta = self._get(f"/criptas/{cripta_id}")
         self._presupuesto = respuesta["presupuesto_solicitudes"]
         return respuesta
 
 
     def esqueleto_cripta(self, cripta_id: str, pagina: int) -> dict:
-
+        """"'informacion del esqueleto de la cripta"""
         return self._get(f"/criptas/{cripta_id}/salas", params={"pagina": pagina})
 
     def contenido_salas(self, cripta_id: str, sala_ids: list) -> dict:
-
+        """"'contenido de salas listado,se permiten 10 salas por solicitud """
         if len(sala_ids) > 10:
-            raise ValueError("Máximo 10 salas por solicitud")
+            raise ValueError("tope de maximo 10 salas por solicitud")
         salas = ",".join(str(s) for s in sala_ids)
         return self._get(f"/criptas/{cripta_id}/contenido", params={"salas": salas})
 
     def catalogo(self, tipo_ids: list) -> dict:
-
+        """"'informacion del catalogo se unen los ids por formato y se verifican el maximo
+        10 ids
+        """
         if len(tipo_ids) > 10:
             raise ValueError("Máximo 10 ids por solicitud")
         ids = ",".join(tipo_ids)
         return self._get("/catalogo", params={"ids": ids})
 
     def version_cripta(self, cripta_id: str) -> dict:
-
+        """"'version de la cripta """
         return self._get(f"/criptas/{cripta_id}/version")
 
     def version_catalogo(self) -> dict:
-
+        """"'version del catalogo"""
         return self._get("/catalogo/version")
 
+    """"'metodos momentaneos son para verificar la funcionalidad de la conexion"""
     @property
     def requests_realizados(self) -> int:
         return self._contador

@@ -1,0 +1,10 @@
+{
+  "criptas": [
+    {
+      "id": "cripta-01",
+      "nombre": "Osario menor",
+      "salas": 6,
+      "dificultad": 1
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "pagina": 1,
+  "total_paginas": 1,
+  "salas": [
+    {
+      "id": 1,
+      "nombre": "Entrada derruida",
+      "salidas": {
+        "N": { "sala": 2 }
+      }
+    },
+    {
+      "id": 2,
+      "nombre": "Pasillo de las urnas",
+      "salidas": {
+        "S": { "sala": 1 },
+        "N": { "sala": 3 },
+        "E": { "sala": 4 }
+      }
+    },
+    {
+      "id": 3,
+      "nombre": "Cripta baja",
+      "salidas": {
+        "S": { "sala": 2 },
+        "N": { "sala": 5 }
+      }
+    },
+    {
+      "id": 4,
+      "nombre": "Sala este",
+      "salidas": {
+        "O": { "sala": 2 }
+      }
+    },
+    {
+      "id": 5,
+      "nombre": "Sala norte",
+      "salidas": {
+        "S": { "sala": 3 }
+      }
+    },
+    {
+      "id": 6,
+      "nombre": "Salida",
+      "salidas": {
+        "S": { "sala": 5, "cerrada": true, "llave": "itm_llave_bronce" }
+      }
+    }
+  ]
+}
