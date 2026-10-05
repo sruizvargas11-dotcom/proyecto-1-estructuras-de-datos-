@@ -1,0 +1,7 @@
+{
+  "id": "trp_dardos",
+  "nombre": "Dardos en la pared",
+  "clase": "trampa",
+  "daño": 4,
+  "rearme": 300
+}

@@ -1,0 +1,9 @@
+{
+  "sala": 3,
+  "enemigos": [],
+  "objetos": [
+    "itm_llave_bronce",
+    "itm_coraza_cuero"
+  ],
+  "trampas": []
+}

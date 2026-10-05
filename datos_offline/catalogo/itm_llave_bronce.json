@@ -1,0 +1,8 @@
+{
+  "id": "itm_llave_bronce",
+  "nombre": "Llave de bronce",
+  "clase": "llave",
+  "peso": 1,
+  "valor": 0,
+  "abre": "puerta_2_7"
+}
