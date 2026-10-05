@@ -5,7 +5,7 @@ apilar/desapilar usan el frente, y el descarte por límite usa el fondo. Para el
 cada elemento es un delta, nunca una copia completa.
 """
 
-from lista_doble import ListaDoble
+from estructuras.lista_doble import ListaDoble
 
 class Pila:
     def __init__(self, capacidad_maxima = None):

@@ -26,18 +26,23 @@ class ListaSimple:
     def esta_vacia(self):
         return self._tamano == 0
 
+
+    """CORRECCION DE NODOS"""
+
     def insertar_al_inicio(self, valor):
         """O(1): El nuevo nodo pasa a ser la cabeza directamente. """
         nodo = NodoSimple(valor)
         nodo.siguiente = self._head
+        self._head = nodo
         self._tamano += 1
         self.contador_inserciones += 1
         return nodo
+
     def eliminar_valor(self, valor):
         """Quita la primera ocurrencia del valor. O(N): hay que recorrer buscando, porque no se
         conoce en dónde está."""
         anterior = None
-        actual = self._cabeza
+        actual = self._head
 
         while actual is not None:
             if actual.valor == valor:
@@ -61,7 +66,7 @@ class ListaSimple:
     def recorrer_valores(self):
         """Generador: recorre de head a cola, de uno en uno."""
         self.contador_recorridos += 1
-        actual = self._cabeza
+        actual = self._head
         while actual is not None:
             yield actual.valor
             actual = actual.siguiente

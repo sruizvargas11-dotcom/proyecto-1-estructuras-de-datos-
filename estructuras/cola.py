@@ -34,19 +34,27 @@ class Cola:
         return self._tamano == 0
 
     def encolar(self, valor):
-        """O(1). Se agrega directo en _final, sin recorrer la cola. """
-
+        """Agrega al final sin recorrer la cola."""
         nodo = _NodoCola(valor)
 
-        if self._final is None:
+        # Conectar el último nodo existente con el nuevo.
+        if self._final is not None:
             self._final.siguiente = nodo
+
+        # El nuevo nodo siempre pasa a ser el último.
         self._final = nodo
+
+        # Si estaba vacía, también será el primero.
         if self._frente is None:
             self._frente = nodo
+
         self._tamano += 1
         self.contador_encolados += 1
 
-        if self._capacidad_maxima is not None and self._tamano > self._capacidad_maxima:
+        if (
+                self._capacidad_maxima is not None
+                and self._tamano > self._capacidad_maxima
+        ):
             self._frente = self._frente.siguiente
             self._tamano -= 1
             self.contador_descartes_por_limite += 1
@@ -68,3 +76,5 @@ class Cola:
     def ver_frente(self):
         """Consulta el próximo elemento a salir, sin quitarlo. """
         return self._frente.valor if self._frente is not None else None
+
+
