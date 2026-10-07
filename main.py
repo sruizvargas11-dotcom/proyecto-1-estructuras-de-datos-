@@ -1,12 +1,28 @@
-import uuid
-import requests
-BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1"
-client_id = str(uuid.uuid4())
-headers = {"X-Cripta-Client-Id": client_id}
-respuesta = requests.get(
-f"{BASE_URL}/criptas",
-headers=headers,
-timeout=10,
-)
-print(respuesta.status_code)
-print(respuesta.json())
+import sys
+
+
+def crear_fuente(argumentos):
+    if "--offline" in argumentos:
+        from adaptadores.datos_offline import DatosOffline
+
+        return DatosOffline()
+
+    from adaptadores.datos_http import DatosHTTP
+
+    return DatosHTTP()
+
+
+def main():
+    argumentos = sys.argv[1:]
+    fuente = crear_fuente(argumentos)
+
+    respuesta = fuente.listar_criptas()
+
+    print("Criptas disponibles:")
+
+    for cripta in respuesta["criptas"]:
+        print(f"- {cripta['id']}: {cripta['nombre']}")
+
+
+if __name__ == "__main__":
+    main()

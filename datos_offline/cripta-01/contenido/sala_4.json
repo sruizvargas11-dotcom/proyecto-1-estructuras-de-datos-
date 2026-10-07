@@ -1,0 +1,14 @@
+{
+  "sala": 4,
+  "enemigos": [
+    {
+      "instancia": "e-401",
+      "tipo": "ent_guardian_oseo"
+    }
+  ],
+  "objetos": [
+    "itm_llave_negra",
+    "itm_pocion_menor"
+  ],
+  "trampas": []
+}

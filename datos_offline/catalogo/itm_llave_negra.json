@@ -1,0 +1,8 @@
+{
+  "id": "itm_llave_negra",
+  "nombre": "Llave negra",
+  "clase": "llave",
+  "peso": 1,
+  "valor": 0,
+  "abre": "puerta_salida"
+}

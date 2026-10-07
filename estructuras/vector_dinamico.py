@@ -25,7 +25,7 @@ class Vector:
 
     def agregarValor(self, valor):
         """
-        Agrega al final; si no hay espacio, duplica la capacidad primero. 
+        Agrega al final; si no hay espacio, duplica la capacidad primero.
         """
         if self._tamano == self._capacidad:
             self._redimensionarVector(self._capacidad * 2)
@@ -44,14 +44,23 @@ class Vector:
         self._validar_indice(indice)
         self._datos[indice] = valor
 
+    """CORRECCION DE REDIMENSION"""
     def _redimensionarVector(self, nueva_capacidad):
         datos_nuevos = [None] * nueva_capacidad
+
+        # Leer del almacenamiento original hasta terminar la copia.
         for i in range(self._tamano):
             datos_nuevos[i] = self._datos[i]
-            self._datos = datos_nuevos
-            self._capacidad = nueva_capacidad
-            self.contador_redimensiones += 1
+
+        # Estas instrucciones se ejecutan una sola vez, después del ciclo.
+        self._datos = datos_nuevos
+        self._capacidad = nueva_capacidad
+        self.contador_redimensiones += 1
+
 
     def _validar_indice(self, indice):
         if indice < 0 or indice >= self._tamano:
             raise IndexError(f"Índice {indice} fuera de rango (tamaño actual: {self._tamano})")
+
+
+
