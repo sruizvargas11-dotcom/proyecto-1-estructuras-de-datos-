@@ -107,7 +107,7 @@ class ListaDoble:
 
         self.contador_movimientos_al_frente += 1
 
-    def rcorrer_desde_frente(self):
+    def recorrer_desde_frente(self):
         """Generador de nodos (no de valores), de cabeza hacia cola. """
         actual = self._head
         while actual is not None:

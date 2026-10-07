@@ -44,6 +44,18 @@ class Vector:
         self._validar_indice(indice)
         self._datos[indice] = valor
 
+    # agregar esto a vector_dinamico.py
+    def eliminarUltimo(self):
+        """Quita y devuelve el ultimo elemento. O(1), nunca reduce la
+            capacidad reservada (solo el Vector decide cuando redimensionar
+            hacia abajo, y aqui optamos por no hacerlo: ver nota mas abajo)."""
+        if self._tamano == 0:
+            raise IndexError("no se puede eliminar de un Vector vacio")
+        self._tamano -= 1
+        valor = self._datos[self._tamano]
+        self._datos[self._tamano] = None
+        return valor
+
     """CORRECCION DE REDIMENSION"""
     def _redimensionarVector(self, nueva_capacidad):
         datos_nuevos = [None] * nueva_capacidad
