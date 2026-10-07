@@ -1,0 +1,8 @@
+{
+  "id": "itm_daga_oxidada",
+  "nombre": "Daga oxidada",
+  "clase": "arma",
+  "peso": 2,
+  "valor": 15,
+  "ataque_bonus": 3
+}

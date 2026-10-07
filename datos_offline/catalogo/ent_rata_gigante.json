@@ -1,0 +1,13 @@
+{
+  "id": "ent_rata_gigante",
+  "nombre": "Rata gigante",
+  "clase": "enemigo",
+  "vida_max": 12,
+  "ataque": 5,
+  "defensa": 1,
+  "velocidad": 150,
+  "comportamiento": "rastreador",
+  "suelta": [
+    "itm_pocion_menor"
+  ]
+}

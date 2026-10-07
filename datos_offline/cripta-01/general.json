@@ -6,7 +6,7 @@
   "salas_por_pagina": 50,
   "sala_inicial": 1,
   "sala_salida": 6,
-  "llave_salida": "itm_llave_bronce",
+  "llave_salida": "itm_llave_negra",
   "presupuesto_solicitudes": 9,
   "inventario_max": 10,
   "jugador": {

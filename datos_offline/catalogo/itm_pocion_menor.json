@@ -1,0 +1,8 @@
+{
+  "id": "itm_pocion_menor",
+  "nombre": "Poción menor",
+  "clase": "pocion",
+  "peso": 1,
+  "valor": 10,
+  "cura": 8
+}

@@ -11,7 +11,7 @@ import requests
 from adaptadores.fuente_datos import FuenteDeDatos
 
 BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1"
-
+## Recomendación: Utilizar la API Key como una variable de entorno para no exponerla
 
 class DatosHTTP(FuenteDeDatos):
     """Implementación de FuenteDeDatos que consume el api  de la cripta."""

@@ -1,0 +1,8 @@
+{
+  "id": "itm_coraza_cuero",
+  "nombre": "Coraza de cuero",
+  "clase": "armadura",
+  "peso": 4,
+  "valor": 20,
+  "defensa_bonus": 2
+}

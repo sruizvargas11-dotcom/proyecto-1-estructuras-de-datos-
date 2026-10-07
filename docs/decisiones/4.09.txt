@@ -1,0 +1,26 @@
+4.9 - ORDENAMIENTO
+(Redacta ROL 2, Revisa ROL 1)
+
+1 - PROBLEMA
+¿Cual es la situación a resolver?
+¿Qué operaciones debería ejecutar el programa?
+
+2 - ALTERNATIVAS
+Al menos 2 opciones y la razón concreta por la que una o varias se descartaron
+
+3 - DECISIÓN
+Estrategia implementada y cómo se estructuró en el programa
+
+4 - COMPLEJIDAD ALGORÍTMICA
+Por lo menos la de la operación más frecuente
+
+5 - EVIDENCIA
+Tabla del --bench que incluya:
+• repeticiones
+• mediana de rendimiento
+• equipo utilizado
+1 para la alternativa utilizada y otra/s para la/s alternativa/s descartada/s
+
+6 - LÍMITES
+Condiciones en las que la decisión deja de ser apropiada
+Incluir datos cuando sea posible

@@ -1,0 +1,8 @@
+{
+  "id": "itm_antorcha",
+  "nombre": "Antorcha",
+  "clase": "antorcha",
+  "peso": 1,
+  "valor": 5,
+  "duracion": 2000
+}
