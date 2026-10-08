@@ -16,6 +16,10 @@ class _NodoCola:
 
 class Cola:
     def __init__(self, capacidad_maxima = None):
+        if capacidad_maxima is not None and (
+            type(capacidad_maxima) is not int or capacidad_maxima <= 0
+        ):
+            raise ValueError("La capacidad debe ser un entero positivo o None.")
         self._frente = None
         self._final = None
         self._tamano = 0
@@ -76,5 +80,3 @@ class Cola:
     def ver_frente(self):
         """Consulta el próximo elemento a salir, sin quitarlo. """
         return self._frente.valor if self._frente is not None else None
-
-

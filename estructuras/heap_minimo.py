@@ -4,7 +4,7 @@ Usa un método de eliminación conocido como 'lazy evaluation': cancelar un even
 simplemente lo marca inválido y se descarta sólo cuando llega a la raíz. Leer la documentación de este método acá: https://realpython.com/python-lazy-evaluation/
 """
 
-from vector_dinamico import Vector
+from estructuras.vector_dinamico import Vector
 
 class _EntradaHeap:
     def __init__(self, tiempo, secuencia, dato):
@@ -37,9 +37,12 @@ class HeapMinimo:
         """
         O(log n). Devuelve la entrada, para poder invalidarla despues si hace falta cancelar o reprogramar un evento.
         """
+        if type(tiempo) is not int or tiempo < 0:
+            raise ValueError("El tiempo debe ser un entero no negativo.")
         entrada = _EntradaHeap(tiempo, self._siguiente_secuencia, dato)
         self._siguiente_secuencia += 1
         self._datos.agregarValor(entrada)
+        self._flotar(len(self._datos) - 1)
         self._contador_inserciones += 1
         return entrada
     def invalidarEntrada(self, entrada):
@@ -52,12 +55,13 @@ class HeapMinimo:
         """
         Invalida la entrada vieja e inserta una nueva con el nuevo tiempo. Devuelve la nueva entrada.
         """
+        nueva = self.insertarEntrada(nuevo_tiempo, entrada.dato)
         self.invalidarEntrada(entrada)
-        return self.insertarEntrada(nuevo_tiempo, entrada.dato)
+        return nueva
 
     def extraer_minimo(self):
         """
-        O(log n). Puede devolver None por dos motivos: el heap está realmente vacio, o solo quedaban entradas canceladas, que se
+        O((k + 1) log n) si descarta k entradas canceladas. Puede devolver None por dos motivos: el heap está realmente vacio, o solo quedaban entradas canceladas, que se
         descartan automáticamente en el camino.
         """
 
@@ -119,6 +123,3 @@ class HeapMinimo:
         temp = self._datos.obtenerValor(i)
         self._datos.asignarValor(i, self._datos.obtenerValor(j))
         self._datos.asignarValor(j, temp)
-
-
-

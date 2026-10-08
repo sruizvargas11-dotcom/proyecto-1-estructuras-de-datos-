@@ -8,15 +8,16 @@ tabla de puntajes como las vistas del inventario (por peso, valor o
 nombre), sin duplicar codigo por cada criterio.
 """
 
-from vector_dinamico import Vector
+from estructuras.vector_dinamico import Vector
 
 UMBRAL_TAMANO_PEQUENO = 30       # se ajusta con --bench
-UMBRAL_DESORDEN_RELATIVO = 0.1   # 10% de pares adyacentes desordenados
+# El umbral de tamaño es provisional hasta calibrarlo con --bench.
+# Pocos descensos adyacentes NO garantizan pocas inversiones: dos bloques
+# ordenados en orden inverso pueden requerir O(n^2) movimientos en Insertion.
 
 
 def insertion_sort(vector, comparar):
-    """In-place, O(n^2) en el peor caso, O(n) si los datos ya estan
-    casi ordenados - por eso es la mejor opcion para listas pequenas
+    """In-place, O(n^2) en el peor caso, O(n + I), donde I es la cantidad de inversiones - por eso es la mejor opcion para listas pequenas
     o con pocos elementos fuera de lugar."""
     for i in range(1, len(vector)):
         actual = vector.obtenerValor(i)
@@ -93,7 +94,7 @@ def elegir_algoritmo(vector, comparar, comparacion_costosa=False):
         return insertion_sort
 
     desorden = contar_desorden_local(vector, comparar)
-    if desorden <= UMBRAL_DESORDEN_RELATIVO * n and not comparacion_costosa:
+    if desorden == 0 and not comparacion_costosa:
         return insertion_sort
 
     return merge_sort

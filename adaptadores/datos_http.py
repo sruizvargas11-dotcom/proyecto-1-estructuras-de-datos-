@@ -16,32 +16,50 @@ BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1
 class DatosHTTP(FuenteDeDatos):
     """Implementación de FuenteDeDatos que consume el api  de la cripta."""
 
-    def __init__(self):
+    def __init__(self, max_reintentos=3):
+        if type(max_reintentos) is not int or max_reintentos < 0:
+            raise ValueError("max_reintentos debe ser un entero no negativo")
+        self._max_reintentos = max_reintentos
         self._base_url = BASE_URL
         self._client_id = str(uuid.uuid4())
         self._headers = {"X-Cripta-Client-Id": self._client_id}
         self._contador = 0
-        self._presupuesto = 0
+        self._presupuesto = None
 
 
 
     def _get(self, ruta: str, params: dict = None) -> dict:
         """se comunica con el servidor aca pasan los gets """
+        reintentos = 0
         while True:
-            respuesta = requests.get(
-                f"{self._base_url}{ruta}",
-                headers=self._headers,
-                params=params,
-                timeout=10,
-            )
+            if self._presupuesto is not None and self._contador >= self._presupuesto:
+                raise RuntimeError("Presupuesto de solicitudes agotado.")
             self._contador += 1
+            try:
+                respuesta = requests.get(
+                    f"{self._base_url}{ruta}", headers=self._headers,
+                    params=params, timeout=10,
+                )
+            except requests.RequestException as error:
+                raise RuntimeError(f"No se pudo consultar {ruta}: {error}") from error
 
             if respuesta.status_code == 200:
-                return respuesta.json()
+                datos = respuesta.json()
+                if not isinstance(datos, dict):
+                    raise ValueError(f"Respuesta JSON inválida en {ruta}")
+                return datos
 
             if respuesta.status_code == 429:
-                espera = respuesta.json().get("reintentar_en", 5)
+                if reintentos >= self._max_reintentos:
+                    raise RuntimeError("El servidor sigue ocupado: límite de reintentos alcanzado.")
+                if self._presupuesto is not None and self._contador >= self._presupuesto:
+                    raise RuntimeError("Presupuesto de solicitudes agotado.")
+                datos = respuesta.json()
+                espera = datos.get("reintentar_en", 5) if isinstance(datos, dict) else None
+                if type(espera) not in (int, float) or not 0 <= espera <= 60:
+                    raise ValueError("Intervalo de reintento inválido o mayor de 60 segundos.")
                 time.sleep(espera)
+                reintentos += 1
                 continue
 
             raise RuntimeError(
@@ -58,7 +76,12 @@ class DatosHTTP(FuenteDeDatos):
     def datos_cripta(self, cripta_id: str) -> dict:
         """GET #2 -datos generales y se tiene la cantidad de solicitudes """
         respuesta = self._get(f"/criptas/{cripta_id}")
-        self._presupuesto = respuesta["presupuesto_solicitudes"]
+        presupuesto = respuesta.get("presupuesto_solicitudes")
+        if type(presupuesto) is not int or presupuesto < 0:
+            raise ValueError("Presupuesto de solicitudes inválido.")
+        self._presupuesto = presupuesto
+        if self._contador > presupuesto:
+            raise RuntimeError("La carga inicial ya excedió el presupuesto informado.")
         return respuesta
 
 
@@ -68,7 +91,7 @@ class DatosHTTP(FuenteDeDatos):
 
     def contenido_salas(self, cripta_id: str, sala_ids: list) -> dict:
         """"'contenido de salas listado,se permiten 10 salas por solicitud """
-        if len(sala_ids) > 10:
+        if not sala_ids or len(sala_ids) > 10:
             raise ValueError("tope de maximo 10 salas por solicitud")
         salas = ",".join(str(s) for s in sala_ids)
         return self._get(f"/criptas/{cripta_id}/contenido", params={"salas": salas})
@@ -77,7 +100,7 @@ class DatosHTTP(FuenteDeDatos):
         """"'informacion del catalogo se unen los ids por formato y se verifican el maximo
         10 ids
         """
-        if len(tipo_ids) > 10:
+        if not tipo_ids or len(tipo_ids) > 10:
             raise ValueError("Máximo 10 ids por solicitud")
         ids = ",".join(tipo_ids)
         return self._get("/catalogo", params={"ids": ids})
@@ -97,11 +120,11 @@ class DatosHTTP(FuenteDeDatos):
 
     @property
     def presupuesto(self) -> int:
-        return self._presupuesto
+        return self._presupuesto if self._presupuesto is not None else 0
 
     @property
     def dentro_del_presupuesto(self) -> bool:
-        if self._presupuesto == 0:
+        if self._presupuesto is None:
             return True
         return self._contador <= self._presupuesto
 
@@ -109,7 +132,7 @@ class DatosHTTP(FuenteDeDatos):
         return {
             "client_id": self._client_id,
             "requests_realizados": self._contador,
-            "presupuesto": self._presupuesto,
+            "presupuesto": self.presupuesto,
             "dentro_del_limite": self.dentro_del_presupuesto,
         }
 

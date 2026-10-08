@@ -8,7 +8,12 @@ cada elemento es un delta, nunca una copia completa.
 from estructuras.lista_doble import ListaDoble
 
 class Pila:
-    def __init__(self, capacidad_maxima = None):
+    def __init__(self, capacidad_maxima=5):
+        if capacidad_maxima is not None and (
+            type(capacidad_maxima) is not int
+            or capacidad_maxima <= 0
+        ):
+            raise ValueError("La capacidad debe ser un entero positivo o None.")
         self._lista = ListaDoble()
         self._capacidad_maxima = capacidad_maxima
 
@@ -52,5 +57,4 @@ class Pila:
 
         nodo_head = self._lista.head()
         return nodo_head.valor if nodo_head is not None else None
-    
-        
+

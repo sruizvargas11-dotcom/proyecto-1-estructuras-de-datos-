@@ -70,3 +70,22 @@ class ListaSimple:
         while actual is not None:
             yield actual.valor
             actual = actual.siguiente
+
+    def insertar_al_final(self, valor):
+        """O(n): esta implementación conserva únicamente la cabeza."""
+        if self._head is None:
+            return self.insertar_al_inicio(valor)
+        actual = self._head
+        while actual.siguiente is not None:
+            actual = actual.siguiente
+        nodo = NodoSimple(valor)
+        actual.siguiente = nodo
+        self._tamano += 1
+        self.contador_inserciones += 1
+        return nodo
+
+    def __iter__(self):
+        return self.recorrer_valores()
+
+    def a_lista_python(self):
+        return list(self.recorrer_valores())

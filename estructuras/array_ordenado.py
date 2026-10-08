@@ -8,7 +8,7 @@ archivo secuencialmente.
 Se construye sobre el vector propio.
 """
 
-from vector_dinamico import Vector
+from estructuras.vector_dinamico import Vector
 
 
 class ArrayOrdenado:
@@ -32,6 +32,11 @@ class ArrayOrdenado:
         guardado: se escribe una vez por partida, se busca muchas)."""
 
         posicion = self._encontrar_posicion_de_insercion(clave)
+
+        # Un índice tiene una sola entrada por clave: actualizar si ya existe.
+        if posicion < len(self._datos) and self._datos.obtenerValor(posicion)[0] == clave:
+            self._datos.asignarValor(posicion, (clave, valor))
+            return
 
         # desplazar todo lo que esta a partir de 'posicion' una casilla
         # a la derecha, para abrir espacio

@@ -26,7 +26,7 @@ class PersistenciaVersiones:
         return self._leer(ruta, version_actual)
 
     def _ruta_cripta(self, cripta_id):
-        if not isinstance(cripta_id, str) or not cripta_id:
+        if not isinstance(cripta_id, str) or not cripta_id.strip():
             raise ValueError("El identificador debe ser un texto no vacío.")
 
         if cripta_id in (".", "..") or any(
@@ -41,12 +41,14 @@ class PersistenciaVersiones:
             raise ValueError("La versión debe ser un texto no vacío.")
 
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_text(version.strip(), encoding="utf-8")
+        temporal = ruta.with_suffix(".tmp")
+        temporal.write_text(version.strip(), encoding="utf-8")
+        temporal.replace(ruta)
 
     def _leer(self, ruta, version_actual):
         try:
             version_local = ruta.read_text(encoding="utf-8").strip()
-        except FileNotFoundError:
+        except (FileNotFoundError, UnicodeDecodeError):
             return None
 
         if not version_local:
@@ -56,5 +58,3 @@ class PersistenciaVersiones:
             return None
 
         return version_local
-
-

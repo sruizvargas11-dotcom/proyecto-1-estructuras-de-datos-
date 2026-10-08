@@ -6,7 +6,7 @@ tal y como se pide en la bitácora en pantalla.
 
 class ArrayCircular:
     def __init__(self, capacidad):
-        if capacidad <= 0:
+        if type(capacidad) is not int or capacidad <= 0:
             raise ValueError("La capacidad debe ser mayor a 0.")
         self._datos = [None] * capacidad
         self._capacidad = capacidad
@@ -52,4 +52,3 @@ class ArrayCircular:
             resultado.append(self._datos[posicion])
 
         return resultado
-

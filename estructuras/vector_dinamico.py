@@ -44,6 +44,19 @@ class Vector:
         self._validar_indice(indice)
         self._datos[indice] = valor
 
+    def eliminar(self, indice):
+        """Elimina por posición y conserva el orden. O(n) por desplazamientos."""
+        self._validar_indice(indice)
+        valor = self._datos[indice]
+        for i in range(indice, self._tamano - 1):
+            self._datos[i] = self._datos[i + 1]
+        self.eliminarUltimo()
+        return valor
+
+    def __iter__(self):
+        for i in range(self._tamano):
+            yield self._datos[i]
+
     # agregar esto a vector_dinamico.py
     def eliminarUltimo(self):
         """Quita y devuelve el ultimo elemento. O(1), nunca reduce la
@@ -71,8 +84,7 @@ class Vector:
 
 
     def _validar_indice(self, indice):
+        if type(indice) is not int:
+            raise TypeError("El índice debe ser un entero.")
         if indice < 0 or indice >= self._tamano:
             raise IndexError(f"Índice {indice} fuera de rango (tamaño actual: {self._tamano})")
-
-
-

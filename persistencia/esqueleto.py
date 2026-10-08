@@ -15,7 +15,7 @@ class PersistenciaEsqueleto:
         self._carpeta_base = Path(carpeta_base)
 
     def _ruta(self, cripta_id):
-        if not isinstance(cripta_id, str) or not cripta_id:
+        if not isinstance(cripta_id, str) or not cripta_id.strip():
             raise ValueError("El identificador debe ser un texto no vacío.")
 
         if cripta_id in (".", "..") or any(
@@ -60,6 +60,16 @@ class PersistenciaEsqueleto:
                 "salidas": salidas,
             })
 
+        if not self._estructura_valida(datos):
+            raise ValueError("El esqueleto contiene campos inválidos.")
+        # Exigir un modelo finalizado y destinos existentes antes de tocar el disco.
+        for identificador in (cripta.sala_inicial_id, cripta.sala_salida_id):
+            if cripta.sala_por_id(identificador) is None:
+                raise ValueError("Sala inicial o de salida inexistente.")
+        for sala in cripta.recorrer_salas():
+            for salida in sala.salidas.recorrer_valores():
+                if cripta.sala_por_id(salida.sala_destino_id) is None:
+                    raise ValueError("Una salida apunta a una sala inexistente.")
         texto = json.dumps(datos, ensure_ascii=False, indent=2)
 
         ruta = self._ruta(cripta.id)
@@ -79,12 +89,15 @@ class PersistenciaEsqueleto:
 
         try:
             texto = ruta.read_text(encoding="utf-8")
-        except FileNotFoundError:
+        except (FileNotFoundError, UnicodeDecodeError):
             return None
 
         try:
             datos = json.loads(texto)
         except json.JSONDecodeError:
+            return None
+
+        if not self._estructura_valida(datos):
             return None
 
         if (
@@ -120,6 +133,66 @@ class PersistenciaEsqueleto:
 
             cripta.agregar_sala(sala)
 
-        cripta.finalizar_carga()
+        try:
+            cripta.finalizar_carga()
+        except ValueError:
+            return None
+
+        if (cripta.sala_por_id(cripta.sala_inicial_id) is None
+                or cripta.sala_por_id(cripta.sala_salida_id) is None):
+            return None
+        for sala in cripta.recorrer_salas():
+            for salida in sala.salidas.recorrer_valores():
+                if cripta.sala_por_id(salida.sala_destino_id) is None:
+                    return None
         return cripta
 
+
+    @staticmethod
+    def _estructura_valida(datos):
+        """Validar el documento JSON antes de construir objetos del modelo."""
+        if not isinstance(datos, dict):
+            return False
+        campos = ("formato", "id", "version", "sala_inicial_id",
+                  "sala_salida_id", "llave_salida", "presupuesto_solicitudes",
+                  "inventario_max", "salas")
+        if any(campo not in datos for campo in campos):
+            return False
+        if type(datos["formato"]) is not int:
+            return False
+        if any(not isinstance(datos[c], str) or not datos[c]
+               for c in ("id", "version")):
+            return False
+        if any(type(datos[c]) is not int for c in
+               ("sala_inicial_id", "sala_salida_id", "presupuesto_solicitudes", "inventario_max")):
+            return False
+        if datos["presupuesto_solicitudes"] < 0 or datos["inventario_max"] < 0:
+            return False
+        if datos["llave_salida"] is not None and not isinstance(datos["llave_salida"], str):
+            return False
+        if not isinstance(datos["salas"], list) or not datos["salas"]:
+            return False
+        for sala in datos["salas"]:
+            if not isinstance(sala, dict):
+                return False
+            if type(sala.get("id")) is not int or not isinstance(sala.get("nombre"), str):
+                return False
+            if not isinstance(sala.get("salidas"), list):
+                return False
+            direcciones = []
+            for salida in sala["salidas"]:
+                if not isinstance(salida, dict) or any(c not in salida for c in
+                        ("direccion", "sala_destino_id", "cerrada", "llave", "cierre_automatico")):
+                    return False
+                direccion = salida["direccion"]
+                if direccion not in ("N", "S", "E", "O") or direccion in direcciones:
+                    return False
+                direcciones.append(direccion)
+                if type(salida["sala_destino_id"]) is not int or type(salida["cerrada"]) is not bool:
+                    return False
+                if salida["llave"] is not None and not isinstance(salida["llave"], str):
+                    return False
+                cierre = salida["cierre_automatico"]
+                if cierre is not None and (type(cierre) is not int or cierre < 0):
+                    return False
+        return True
