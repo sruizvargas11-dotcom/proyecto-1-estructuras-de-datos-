@@ -20,6 +20,11 @@ class ListaSimple:
         self.contador_eliminaciones = 0
         self.contador_recorridos = 0
 
+        self.contador_busquedas = 0
+        self.contador_intentos_eliminacion = 0
+        self.contador_comparaciones = 0
+        self.contador_elementos_recorridos = 0
+
     def __len__(self):
         return self._tamano
 
@@ -41,10 +46,12 @@ class ListaSimple:
     def eliminar_valor(self, valor):
         """Quita la primera ocurrencia del valor. O(N): hay que recorrer buscando, porque no se
         conoce en dónde está."""
+        self.contador_intentos_eliminacion += 1
         anterior = None
         actual = self._head
 
         while actual is not None:
+            self.contador_comparaciones += 1
             if actual.valor == valor:
                 if anterior is None:
                     self._head = actual.siguiente
@@ -58,7 +65,9 @@ class ListaSimple:
         return False
 
     def contiene_valor(self, valor):
+        self.contador_busquedas += 1
         for elemento in self.recorrer_valores():
+            self.contador_comparaciones += 1
             if elemento == valor:
                 return True
         return False
@@ -68,5 +77,38 @@ class ListaSimple:
         self.contador_recorridos += 1
         actual = self._head
         while actual is not None:
+            self.contador_elementos_recorridos += 1
             yield actual.valor
             actual = actual.siguiente
+
+    def insertar_al_final(self, valor):
+        """O(n): esta implementación conserva únicamente la cabeza."""
+        if self._head is None:
+            return self.insertar_al_inicio(valor)
+        actual = self._head
+        while actual.siguiente is not None:
+            actual = actual.siguiente
+        nodo = NodoSimple(valor)
+        actual.siguiente = nodo
+        self._tamano += 1
+        self.contador_inserciones += 1
+        return nodo
+
+    def __iter__(self):
+        return self.recorrer_valores()
+
+    def a_lista_python(self):
+        return list(self.recorrer_valores())
+
+    def contadores(self):
+        """Devuelve las métricas sin modificar los contadores."""
+        return (
+            ("inserciones", self.contador_inserciones),
+            ("eliminaciones", self.contador_eliminaciones),
+            ("recorridos", self.contador_recorridos),
+            ("busquedas", self.contador_busquedas),
+            ("intentos_eliminacion", self.contador_intentos_eliminacion),
+            ("comparaciones", self.contador_comparaciones),
+            ("elementos_recorridos", self.contador_elementos_recorridos),
+        )
+

@@ -8,7 +8,7 @@ archivo secuencialmente.
 Se construye sobre el vector propio.
 """
 
-from vector_dinamico import Vector
+from estructuras.vector_dinamico import Vector
 
 
 class ArrayOrdenado:
@@ -19,6 +19,8 @@ class ArrayOrdenado:
         self.contador_inserciones = 0
         self.contador_busquedas = 0
         self.contador_comparaciones = 0
+        self.contador_actualizaciones = 0
+        self.contador_desplazamientos = 0
 
     def __len__(self):
         return len(self._datos)
@@ -33,11 +35,20 @@ class ArrayOrdenado:
 
         posicion = self._encontrar_posicion_de_insercion(clave)
 
+        # Un índice tiene una sola entrada por clave: actualizar si ya existe.
+        if posicion < len(self._datos):
+            self.contador_comparaciones += 1
+        if posicion < len(self._datos) and self._datos.obtenerValor(posicion)[0] == clave:
+            self._datos.asignarValor(posicion, (clave, valor))
+            self.contador_actualizaciones += 1
+            return
+
         # desplazar todo lo que esta a partir de 'posicion' una casilla
         # a la derecha, para abrir espacio
         self._datos.agregarValor(None)   # crece el vector en uno
         for i in range(len(self._datos) - 1, posicion, -1):
             self._datos.asignarValor(i, self._datos.obtenerValor(i - 1))
+            self.contador_desplazamientos += 1
 
         self._datos.asignarValor(posicion, (clave, valor))
         self.contador_inserciones += 1
@@ -56,7 +67,8 @@ class ArrayOrdenado:
 
             if clave_actual == clave:
                 return valor_actual
-            elif clave_actual < clave:
+            self.contador_comparaciones += 1
+            if clave_actual < clave:
                 inicio = medio + 1
             else:
                 fin = medio - 1
@@ -73,6 +85,7 @@ class ArrayOrdenado:
         while inicio <= fin:
             medio = (inicio + fin) // 2
             clave_actual, _ = self._datos.obtenerValor(medio)
+            self.contador_comparaciones += 1
 
             if clave_actual < clave:
                 inicio = medio + 1
@@ -80,3 +93,13 @@ class ArrayOrdenado:
                 fin = medio - 1
 
         return inicio
+
+    def contadores(self):
+        """Comparaciones cuenta pruebas entre claves, al insertar y buscar."""
+        return (
+            ("inserciones", self.contador_inserciones),
+            ("actualizaciones", self.contador_actualizaciones),
+            ("busquedas", self.contador_busquedas),
+            ("comparaciones", self.contador_comparaciones),
+            ("desplazamientos", self.contador_desplazamientos),
+        )

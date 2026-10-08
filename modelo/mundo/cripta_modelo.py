@@ -1,11 +1,11 @@
 """Mapa de la cripta con consultas por identificador de sala."""
 
 from estructuras.vector_dinamico import Vector
-from estructuras.ordenamiento import merge_sort
+from estructuras.ordenamientos import ordenar
 
 
-def clave_sala(sala):
-    return sala.id
+def comparar_salas(a, b):
+    return (a.id > b.id) - (a.id < b.id)
 
 
 class CriptaModelo:
@@ -27,6 +27,7 @@ class CriptaModelo:
         self.presupuesto_solicitudes = presupuesto_solicitudes
         self.inventario_max = inventario_max
 
+        self.ultimo_algoritmo = None
         self._salas = Vector()
         self._ordenadas = False
 
@@ -38,22 +39,31 @@ class CriptaModelo:
         self._ordenadas = False
 
     def finalizar_carga(self):
-        """Ordena las salas y habilita las búsquedas por ID."""
+        """Ordena las salas y enlaza los destinos de sus salidas."""
         self._ordenadas = False
 
-        datos = list(self.recorrer_salas())
-        ordenadas = merge_sort(datos, clave_sala)
+        self.ultimo_algoritmo = ordenar(
+            self._salas,
+            comparar_salas,
+        )
 
-        for i in range(1, len(ordenadas)):
-            if ordenadas[i - 1].id == ordenadas[i].id:
+        for i in range(1, len(self._salas)):
+            anterior = self._salas.obtenerValor(i - 1)
+            actual = self._salas.obtenerValor(i)
+
+            if anterior.id == actual.id:
                 raise ValueError(
-                    f"ID de sala repetido: {ordenadas[i].id}"
+                    f"ID de sala repetido: {actual.id}"
                 )
 
-        for i in range(len(ordenadas)):
-            self._salas.asignarValor(i, ordenadas[i])
-
         self._ordenadas = True
+
+        # Todas las salas ya están disponibles y ordenadas.
+        for sala in self.recorrer_salas():
+            for salida in sala.salidas:
+                salida.sala_destino = self.sala_por_id(
+                    salida.sala_destino_id
+                )
 
     def sala_por_id(self, sala_id):
         """Busca en O(log n); devuelve None si el ID no existe."""

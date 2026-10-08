@@ -87,10 +87,10 @@ class DatosOffline(FuenteDeDatos):
 
 
 """ la informacion recibida de la api se almacena en un json, un json por cada get basicamente
-se hace un wrapper funcion que guarda un json normal y se implementa y se llama en el resto de metodos
+se hace un wrapper funcion que lee un json normal y se implementa y se llama en el resto de metodos
  ,validaciones que pide el profe en el enunciado en las demas funciones heredadas se llama al
  wrapper y con el archivo por leer,manejo de excepciones en caso de errores 
- 
+ tiene sus test hechos por claude , y en verificar.py se ve todo corran ese archivo
 
 
 
