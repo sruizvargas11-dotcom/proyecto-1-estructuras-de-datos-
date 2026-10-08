@@ -31,13 +31,20 @@ class ListaLRU:
         self.contador_aciertos = 0
         self.contador_fallos = 0
         self.contador_desalojos = 0
+        self.contador_inserciones = 0
+        self.contador_actualizaciones = 0
+        self.contador_rechazos_capacidad = 0
+        self.contador_referencias_adquiridas = 0
+        self.contador_referencias_liberadas = 0
+        self.contador_comparaciones = 0
 
     def __len__(self):
         return len(self._lista)
 
     def _nodo(self, id_ficha):
-        """Localiza una entrada sin cambiar su orden ni las métricas."""
+        """Localiza una entrada sin cambiar su orden ni los aciertos/fallos."""
         for nodo in self._lista.recorrer_desde_frente():
+            self.contador_comparaciones += 1
             if nodo.valor.id_ficha == id_ficha:
                 return nodo
 
@@ -84,14 +91,17 @@ class ListaLRU:
 
             existente.valor.ficha = ficha
             self._lista.mover_al_frente(existente)
+            self.contador_actualizaciones += 1
             return True
 
         if len(self) >= self._capacidad:
             if not self._desalojar_si_es_posible():
+                self.contador_rechazos_capacidad += 1
                 return False
 
         entrada = _EntradaCatalogo(id_ficha, ficha)
         self._lista.insertar_al_frente(entrada)
+        self.contador_inserciones += 1
 
         return True
 
@@ -103,6 +113,7 @@ class ListaLRU:
             raise KeyError(id_ficha)
 
         nodo.valor.en_uso += 1
+        self.contador_referencias_adquiridas += 1
 
     def desmarcar_en_uso(self, id_ficha):
         """Libera una referencia activa, sin permitir valores negativos."""
@@ -117,6 +128,7 @@ class ListaLRU:
             )
 
         nodo.valor.en_uso -= 1
+        self.contador_referencias_liberadas += 1
 
     def _desalojar_si_es_posible(self):
         """Retira la ficha libre menos recientemente utilizada."""
@@ -137,3 +149,18 @@ class ListaLRU:
         )
 
 
+
+    def contadores_operaciones(self):
+        """Detalle adicional; contadores() conserva su contrato original."""
+        return (
+            ("busquedas", self.contador_aciertos + self.contador_fallos),
+            ("aciertos", self.contador_aciertos),
+            ("fallos", self.contador_fallos),
+            ("desalojos", self.contador_desalojos),
+            ("inserciones", self.contador_inserciones),
+            ("actualizaciones", self.contador_actualizaciones),
+            ("rechazos_capacidad", self.contador_rechazos_capacidad),
+            ("referencias_adquiridas", self.contador_referencias_adquiridas),
+            ("referencias_liberadas", self.contador_referencias_liberadas),
+            ("comparaciones", self.contador_comparaciones),
+        )

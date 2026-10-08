@@ -1,11 +1,12 @@
 """
-Cola (FIFO) con capacidad fija, construída sobre nodos de un solo sentido
+Cola (FIFO) con capacidad configurable, construída sobre nodos de un solo sentido
 (no una lista doble: encolar y desencolar nunca necesitan ir hacia atrás).
 Un puntero directo a _final evita recorrer la cola para agregar al final.
 
 Al llegar al límite, el enunciado puede pedir dos comportamientos según su uso:
-aquí se descarta el más antiguo (igual que el array circular), porque es el comportamiento esperado que necesita
-la precarga de salas y la bitácora de la consola.
+aquí se descarta el más antiguo (igual que el array circular), adecuado para conservar
+los últimos mensajes de la bitácora de la consola.
+Para la precarga de salas se usa sin límite, evitando descartar solicitudes pendientes.
 
 """
 
@@ -31,9 +32,12 @@ class Cola:
         self.contador_desencolados = 0
         self.contador_descartes_por_limite = 0
 
+        self.contador_intentos_desencolar = 0
+        self.contador_consultas_frente = 0
+
     def __len__(self):
         return self._tamano
-    
+
     def esta_vacia(self):
         return self._tamano == 0
 
@@ -66,6 +70,7 @@ class Cola:
     def desencolar(self):
         """O(1). Se quita directo de _frente, sin recorrer la cola. Devuelve None si la cola está vacía."""
 
+        self.contador_intentos_desencolar += 1
         if self._frente is None:
             return None
 
@@ -79,4 +84,15 @@ class Cola:
 
     def ver_frente(self):
         """Consulta el próximo elemento a salir, sin quitarlo. """
+        self.contador_consultas_frente += 1
         return self._frente.valor if self._frente is not None else None
+
+    def contadores(self):
+        """Devuelve las métricas sin modificar los contadores."""
+        return (
+            ("encolados", self.contador_encolados),
+            ("desencolados", self.contador_desencolados),
+            ("descartes_por_limite", self.contador_descartes_por_limite),
+            ("intentos_desencolar", self.contador_intentos_desencolar),
+            ("consultas_frente", self.contador_consultas_frente),
+        )

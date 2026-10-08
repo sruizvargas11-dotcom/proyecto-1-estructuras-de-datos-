@@ -1,6 +1,6 @@
 """
 Heap mínimo (cola de prioridad) sobre el vector propio. Ordena por (tiempo, secuencia) para el desempate.
-Usa un método de eliminación conocido como 'lazy evaluation': cancelar un evento no lo busca ni lo saca del medio del heap,
+Usa eliminación diferida ('lazy deletion'): cancelar un evento no lo busca ni lo saca del medio del heap,
 simplemente lo marca inválido y se descarta sólo cuando llega a la raíz. Leer la documentación de este método acá: https://realpython.com/python-lazy-evaluation/
 """
 
@@ -26,6 +26,10 @@ class HeapMinimo:
         self._contador_inserciones = 0
         self._contador_extracciones = 0
         self.contador_comparaciones = 0
+        self.contador_intentos_extraccion = 0
+        self.contador_cancelaciones = 0
+        self.contador_reprogramaciones = 0
+        self.contador_descartes_cancelados = 0
 
     def __len__(self):
         return len(self._datos)
@@ -49,6 +53,8 @@ class HeapMinimo:
         """
         Cancela un evento sin tocar el heap por dentro.
         """
+        if entrada.valido:
+            self.contador_cancelaciones += 1
         entrada.valido = False
 
     def reprogramarEntrada(self, entrada, nuevo_tiempo):
@@ -57,6 +63,7 @@ class HeapMinimo:
         """
         nueva = self.insertarEntrada(nuevo_tiempo, entrada.dato)
         self.invalidarEntrada(entrada)
+        self.contador_reprogramaciones += 1
         return nueva
 
     def extraer_minimo(self):
@@ -65,12 +72,14 @@ class HeapMinimo:
         descartan automáticamente en el camino.
         """
 
+        self.contador_intentos_extraccion += 1
         while not self.esta_vacio():
             raiz = self._datos.obtenerValor(0)
             self._quitar_raiz()
             if raiz.valido:
                 self._contador_extracciones += 1
                 return raiz.dato
+            self.contador_descartes_cancelados += 1
 
         return None
     # -- operaciones internas del heap.
@@ -123,3 +132,18 @@ class HeapMinimo:
         temp = self._datos.obtenerValor(i)
         self._datos.asignarValor(i, self._datos.obtenerValor(j))
         self._datos.asignarValor(j, temp)
+
+    def contadores(self):
+        """Cancelaciones cuenta marcas nuevas hechas por invalidarEntrada.
+        Una marca directa del dueño se observa al descartar la entrada.
+        Reprogramar también cuenta la inserción y cancelación que realiza.
+        """
+        return (
+            ("inserciones", self._contador_inserciones),
+            ("extracciones", self._contador_extracciones),
+            ("intentos_extraccion", self.contador_intentos_extraccion),
+            ("cancelaciones", self.contador_cancelaciones),
+            ("reprogramaciones", self.contador_reprogramaciones),
+            ("descartes_cancelados", self.contador_descartes_cancelados),
+            ("comparaciones", self.contador_comparaciones),
+        )

@@ -20,6 +20,12 @@ class Vector:
         self.contador_accesos = 0
         self.contador_redimensiones = 0 # cuántas veces el vector necesita redimensionarse
 
+        self.contador_asignaciones = 0
+        self.contador_eliminaciones = 0
+        self.contador_recorridos = 0
+        self.contador_elementos_recorridos = 0
+        self.contador_desplazamientos = 0
+
     def __len__(self):
         return self._tamano
 
@@ -43,6 +49,7 @@ class Vector:
         """ Sobrescribe el valor en una posición que ya existe. """
         self._validar_indice(indice)
         self._datos[indice] = valor
+        self.contador_asignaciones += 1
 
     def eliminar(self, indice):
         """Elimina por posición y conserva el orden. O(n) por desplazamientos."""
@@ -50,11 +57,14 @@ class Vector:
         valor = self._datos[indice]
         for i in range(indice, self._tamano - 1):
             self._datos[i] = self._datos[i + 1]
+            self.contador_desplazamientos += 1
         self.eliminarUltimo()
         return valor
 
     def __iter__(self):
+        self.contador_recorridos += 1
         for i in range(self._tamano):
+            self.contador_elementos_recorridos += 1
             yield self._datos[i]
 
     # agregar esto a vector_dinamico.py
@@ -67,6 +77,7 @@ class Vector:
         self._tamano -= 1
         valor = self._datos[self._tamano]
         self._datos[self._tamano] = None
+        self.contador_eliminaciones += 1
         return valor
 
     """CORRECCION DE REDIMENSION"""
@@ -88,3 +99,17 @@ class Vector:
             raise TypeError("El índice debe ser un entero.")
         if indice < 0 or indice >= self._tamano:
             raise IndexError(f"Índice {indice} fuera de rango (tamaño actual: {self._tamano})")
+
+    def contadores(self):
+        """Devuelve las métricas sin modificar los contadores."""
+        return (
+            ("agregados", self.contador_agregados),
+            ("accesos", self.contador_accesos),
+            ("asignaciones", self.contador_asignaciones),
+            ("eliminaciones", self.contador_eliminaciones),
+            ("redimensiones", self.contador_redimensiones),
+            ("recorridos", self.contador_recorridos),
+            ("elementos_recorridos", self.contador_elementos_recorridos),
+            ("desplazamientos", self.contador_desplazamientos),
+        )
+

@@ -23,9 +23,12 @@ class Pila:
         self.contador_desapilados = 0
         self.contador_descartes_por_limite = 0
 
+        self.contador_intentos_desapilar = 0
+        self.contador_consultas_tope = 0
+
     def __len__(self):
         return len(self._lista)
-    
+
     def esta_vacia(self):
         return self._lista.esta_vacia()
 
@@ -41,9 +44,10 @@ class Pila:
             self.contador_descartes_por_limite += 1
 
     def desapilar_elemento(self):
-        """O(1). Quita y devuelve el elemento más reciente (el frente). 
+        """O(1). Quita y devuelve el elemento más reciente (el frente).
         Devuelve None si la pila está vacía."""
 
+        self.contador_intentos_desapilar += 1
         nodo_head = self._lista.head()
         if nodo_head is None:
             return None
@@ -55,6 +59,17 @@ class Pila:
     def ver_tope(self):
         """Consulta el elemento más reciente sin quitarlo. """
 
+        self.contador_consultas_tope += 1
         nodo_head = self._lista.head()
         return nodo_head.valor if nodo_head is not None else None
+
+    def contadores(self):
+        """Devuelve las métricas sin modificar los contadores."""
+        return (
+            ("apilados", self.contador_apilados),
+            ("desapilados", self.contador_desapilados),
+            ("descartes_por_limite", self.contador_descartes_por_limite),
+            ("intentos_desapilar", self.contador_intentos_desapilar),
+            ("consultas_tope", self.contador_consultas_tope),
+        )
 

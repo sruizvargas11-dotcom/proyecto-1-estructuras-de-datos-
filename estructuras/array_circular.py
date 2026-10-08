@@ -17,6 +17,8 @@ class ArrayCircular:
 
         self.contador_agregados = 0
         self.contador_sobrescrituras = 0
+        self.contador_listados = 0
+        self.contador_elementos_listados = 0
 
 
     def __len__(self):
@@ -45,10 +47,21 @@ class ArrayCircular:
     def listar_en_orden(self):
         """Del elemento más antiguo al más reciente. """
 
+        self.contador_listados += 1
         resultado = []
 
         for i in range(self._tamano):
             posicion = (self._inicio + i) % self._capacidad
             resultado.append(self._datos[posicion])
+            self.contador_elementos_listados += 1
 
         return resultado
+
+    def contadores(self):
+        """Devuelve las métricas sin modificar los contadores."""
+        return (
+            ("agregados", self.contador_agregados),
+            ("sobrescrituras", self.contador_sobrescrituras),
+            ("listados", self.contador_listados),
+            ("elementos_listados", self.contador_elementos_listados),
+        )

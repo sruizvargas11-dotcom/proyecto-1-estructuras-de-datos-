@@ -1,7 +1,7 @@
 """
 Lista doblemente enlazada: NodoDoble con punteros anterior y siguiente. A diferencia de la otra lista simple,
 eliminar_nodo() y mover_al_frente() son O(1) cuando ya se tiene el nodo a mano, porque no hace falta recorrer
-bsucando el anterior. Es la base de la pila, la cola y la lista LRU.
+buscando el anterior. Es la base de la pila y la lista LRU.
 """
 
 
@@ -23,6 +23,10 @@ class ListaDoble:
         self.contador_inserciones = 0
         self.contador_eliminaciones = 0
         self.contador_movimientos_al_frente = 0
+
+        self.contador_recorridos_desde_frente = 0
+        self.contador_recorridos_desde_fondo = 0
+        self.contador_nodos_recorridos = 0
 
     def __len__(self):
         return self._tamano
@@ -134,21 +138,32 @@ class ListaDoble:
 
     def recorrer_desde_frente(self):
         """Generador de nodos (no de valores), de cabeza hacia cola. """
+        self.contador_recorridos_desde_frente += 1
         actual = self._head
 
         while actual is not None:
+            self.contador_nodos_recorridos += 1
             yield actual
             actual = actual.siguiente
 
     def recorrer_desde_fondo(self):
         """Generador de nodos, de cola hacia el head."""
+        self.contador_recorridos_desde_fondo += 1
         actual = self._cola
 
         while actual is not None:
+            self.contador_nodos_recorridos += 1
             yield actual
             actual = actual.anterior
 
-
-
-
+    def contadores(self):
+        """Devuelve las métricas sin modificar los contadores."""
+        return (
+            ("inserciones", self.contador_inserciones),
+            ("eliminaciones", self.contador_eliminaciones),
+            ("movimientos_al_frente", self.contador_movimientos_al_frente),
+            ("recorridos_desde_frente", self.contador_recorridos_desde_frente),
+            ("recorridos_desde_fondo", self.contador_recorridos_desde_fondo),
+            ("nodos_recorridos", self.contador_nodos_recorridos),
+        )
 
