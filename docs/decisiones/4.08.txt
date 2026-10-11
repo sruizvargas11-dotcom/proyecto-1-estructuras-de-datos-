@@ -1,26 +1,22 @@
 4.8 - BITÁCORA EN PANTALLA
 (Redacta ROL 4, Revisa ROL 2)
 
+Borrador técnico B2, 11-10-2026. Propuesta para la vista; revisión humana del rol indicado pendiente.
+
 1 - PROBLEMA
-¿Cual es la situación a resolver?
-¿Qué operaciones debería ejecutar el programa?
+Conservar los últimos 20 mensajes sin crecimiento ilimitado y mostrarlos del más antiguo al más reciente.
 
 2 - ALTERNATIVAS
-Al menos 2 opciones y la razón concreta por la que una o varias se descartaron
+Vector con desplazamiento al borrar el primero: O(k) por mensaje. Cola acotada con nodos: O(1) por mensaje, pero crea nodos. Array circular fijo: O(1) por mensaje y almacenamiento reutilizado.
 
 3 - DECISIÓN
-Estrategia implementada y cómo se estructuró en el programa
+Se propone ArrayCircular(20), ya implementado y probado, para la futura vista. agregarValor sobrescribe el más antiguo al llenarse. Cola queda como alternativa funcional disponible. Esta propuesta resuelve la duplicidad del plan entre cola y array circular; no existe todavía una interfaz conectada y el equipo debe ratificar la elección.
 
 4 - COMPLEJIDAD ALGORÍTMICA
-Por lo menos la de la operación más frecuente
+Agregar O(1). Listar O(k), con k=20 como capacidad elegida. Memoria O(k), constante respecto de la cantidad total de mensajes; listar genera una copia de hasta k elementos.
 
 5 - EVIDENCIA
-Tabla del --bench que incluya:
-• repeticiones
-• mediana de rendimiento
-• equipo utilizado
-1 para la alternativa utilizada y otra/s para la/s alternativa/s descartada/s
+Pruebas de estructuras y contadores verifican orden, sobrescritura, capacidad y lectura de métricas. Suite completa: 345 aprobadas. Pendiente bench comparativo de 20 y 20 000 mensajes contra vector que desplaza, con repeticiones, medianas y equipo.
 
 6 - LÍMITES
-Condiciones en las que la decisión deja de ser apropiada
-Incluir datos cuando sea posible
+Es un buffer de visualización: no sustituye la bitácora append-only de partida, que corresponde a B3. La conexión con una vista y las mediciones finales están pendientes. No se ha creado ni cambiado una ventana en este cierre.

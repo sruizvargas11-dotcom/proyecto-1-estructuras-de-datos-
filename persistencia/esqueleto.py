@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from persistencia.cache_json import validar_identificador
 
 from modelo.mundo.cripta_modelo import CriptaModelo
 from modelo.mundo.sala import Sala
@@ -15,13 +16,7 @@ class PersistenciaEsqueleto:
         self._carpeta_base = Path(carpeta_base)
 
     def _ruta(self, cripta_id):
-        if not isinstance(cripta_id, str) or not cripta_id.strip():
-            raise ValueError("El identificador debe ser un texto no vacío.")
-
-        if cripta_id in (".", "..") or any(
-            c in cripta_id for c in '/\\:'
-        ):
-            raise ValueError("El identificador no puede contener una ruta.")
+        validar_identificador(cripta_id)
 
         return self._carpeta_base / cripta_id / "esqueleto.json"
 
