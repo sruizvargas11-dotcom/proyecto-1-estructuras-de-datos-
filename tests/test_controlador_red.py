@@ -240,6 +240,22 @@ def test_contenido_y_fichas_vigentes_en_disco_no_generan_request(offline, tmp_pa
     assert red.contador_fichas_desde_disco == 11
 
 
+def test_segunda_instancia_reutiliza_contenido_y_catalogo_persistidos(offline, tmp_path):
+    fuente, cripta = offline
+    primera = ControladorRed(fuente, cripta, tmp_path)
+    primera.garantizar_contenido(2)
+    solicitudes_iniciales = (len(fuente.contenido), len(fuente.lotes_catalogo))
+
+    # Una partida nueva tiene un esqueleto nuevo, pero puede reutilizar la caché.
+    otra_cripta = cargar_esqueleto_completo(fuente, cripta.id)
+    segunda = ControladorRed(fuente, otra_cripta, tmp_path)
+    segunda.garantizar_contenido(2)
+
+    assert (len(fuente.contenido), len(fuente.lotes_catalogo)) == solicitudes_iniciales
+    assert segunda.contador_salas_desde_disco == 1
+    assert segunda.contador_fichas_desde_disco == 3
+
+
 def test_precarga_fallida_no_cae_el_juego(offline, tmp_path):
     fuente, cripta = offline
     red = ControladorRed(fuente, cripta, tmp_path)
@@ -250,6 +266,23 @@ def test_precarga_fallida_no_cae_el_juego(offline, tmp_path):
     assert red.procesar_cola() == 0
     assert 'Presupuesto' in red.ultimo_error
     assert not red.contenido_cargado(2)
+
+
+def test_precarga_fallida_se_reintenta_al_recuperar_la_conexion(offline, tmp_path):
+    fuente, cripta = offline
+    red = ControladorRed(fuente, cripta, tmp_path)
+    red.planificar_precarga(cripta.sala_por_id(1))
+
+    fuente.fallar_contenido = True
+    assert red.procesar_cola() == 0
+    assert red.pendientes() == 3
+
+    fuente.fallar_contenido = False
+    assert red.procesar_cola() == 3
+    assert red.contenido_cargado(2)
+    assert red.contenido_cargado(3)
+    assert red.contenido_cargado(5)
+    assert red.pendientes() == 0
 
 
 def test_garantizar_informa_el_fallo_sin_cargar_a_medias(offline, tmp_path):

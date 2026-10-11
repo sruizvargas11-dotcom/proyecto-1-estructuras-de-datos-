@@ -228,6 +228,7 @@ class ControladorRed:
         except RuntimeError as error:
             self.ultimo_error = f"Precarga de salas {self._texto_ids(lote)}: {error}"
             self.contador_precargas_fallidas += 1
+            self._restaurar_lote(lote)
             return 0
 
 
@@ -295,7 +296,11 @@ class ControladorRed:
         lote = Vector()
         lote.agregarValor(sala_id)
         self._completar_lote(lote)
-        self.solicitar_contenido_lote(lote)
+        try:
+            self.solicitar_contenido_lote(lote)
+        except RuntimeError:
+            self._restaurar_lote(lote)
+            raise
         return sala
 
 
@@ -346,6 +351,17 @@ class ControladorRed:
         self._pendientes.encolar(sala_id)
         self._encoladas.agregarValor(sala_id)
         return True
+
+    def _restaurar_lote(self, lote):
+        """Devuelve a la cola las salas cuya carga no se completó."""
+        for sala_id in lote:
+            if self.contenido_cargado(sala_id):
+                continue
+            for indice, encolada in enumerate(self._encoladas):
+                if encolada == sala_id:
+                    self._encoladas.eliminar(indice)
+                    break
+            self._encolar(sala_id)
 
     def _completar_lote(self, lote):
         """Saca de la cola hasta llenar el lote; salta las ya cargadas."""

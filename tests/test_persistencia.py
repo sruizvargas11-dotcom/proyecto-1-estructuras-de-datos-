@@ -97,6 +97,22 @@ class TestPersistenciaContenido(unittest.TestCase):
         datos_cargados = persistencia.cargar(CRIPTA, 2)
         self.assertEqual(datos_cargados, datos_originales)
 
+    def test_contenido_se_invalida_por_version_guardada_en_el_archivo(self):
+        anterior = PersistenciaContenido(self.carpeta, "v1")
+        anterior.guardar(CRIPTA, 2, {"sala": 2, "enemigos": []})
+
+        vigente = PersistenciaContenido(self.carpeta, "v2")
+        self.assertIsNone(vigente.cargar(CRIPTA, 2))
+
+    def test_contenido_corrupto_se_trata_como_cache_miss(self):
+        ruta = os.path.join(self.carpeta, CRIPTA, "contenido", "sala_2.json")
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write("{")
+
+        persistencia = PersistenciaContenido(self.carpeta, "v1")
+        self.assertIsNone(persistencia.cargar(CRIPTA, 2))
+
 
 class TestPersistenciaCatalogo(unittest.TestCase):
     """Grupo 2 — guardar y recuperar fichas del catálogo."""
@@ -187,6 +203,22 @@ class TestPersistenciaCatalogo(unittest.TestCase):
         self.assertEqual(daga_cargada, ficha_daga)
         self.assertNotEqual(rata_cargada, daga_cargada)
 
+    def test_ficha_se_invalida_por_version_guardada_en_el_archivo(self):
+        anterior = PersistenciaCatalogo(self.carpeta, {"version": "v1"})
+        anterior.guardar_ficha("ent_rata_gigante", {"id": "ent_rata_gigante"})
+
+        vigente = PersistenciaCatalogo(self.carpeta, {"version": "v2"})
+        self.assertIsNone(vigente.cargar_ficha("ent_rata_gigante"))
+
+    def test_ficha_corrupta_se_trata_como_cache_miss(self):
+        persistencia = PersistenciaCatalogo(self.carpeta, "v1")
+        ruta = persistencia.ruta_ficha("ent_rata_gigante")
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write("{")
+
+        self.assertIsNone(persistencia.cargar_ficha("ent_rata_gigante"))
+
 
 class TestIntegracionContenidoCatalogo(unittest.TestCase):
     """Grupo 3 — PersistenciaContenido y PersistenciaCatalogo conviven
@@ -246,7 +278,8 @@ class TestIntegracionContenidoCatalogo(unittest.TestCase):
         self._escribir_version_cripta("v2")
 
         # ...el contenido cacheado con la versión anterior queda invalidado...
-        self.assertIsNone(contenido.cargar(CRIPTA, 2))
+        contenido_nuevo = PersistenciaContenido(self.carpeta, "v2")
+        self.assertIsNone(contenido_nuevo.cargar(CRIPTA, 2))
 
         # ...pero el catálogo es independiente y sigue sirviendo la ficha.
         self.assertEqual(catalogo.cargar_ficha("ent_rata_gigante"), ficha)
