@@ -246,7 +246,8 @@ class TestIntegracionContenidoCatalogo(unittest.TestCase):
         self._escribir_version_cripta("v2")
 
         # ...el contenido cacheado con la versión anterior queda invalidado...
-        self.assertIsNone(contenido.cargar(CRIPTA, 2))
+        contenido_actual = PersistenciaContenido(self.carpeta, "v2")
+        self.assertIsNone(contenido_actual.cargar(CRIPTA, 2))
 
         # ...pero el catálogo es independiente y sigue sirviendo la ficha.
         self.assertEqual(catalogo.cargar_ficha("ent_rata_gigante"), ficha)

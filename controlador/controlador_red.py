@@ -4,6 +4,7 @@ Bloque 1: carga inicial del esqueleto (cargar_cripta).
 Bloque 2: precarga y carga de contenido y catálogo (ControladorRed).
 """
 import os
+from math import isfinite
 
 from modelo.mundo.cripta_modelo import CriptaModelo
 from modelo.mundo.sala import Sala
@@ -15,6 +16,8 @@ from persistencia.esqueleto import PersistenciaEsqueleto
 from persistencia.version import PersistenciaVersiones
 from persistencia.contenido import PersistenciaContenido
 from persistencia.catalogo import PersistenciaCatalogo
+from persistencia.cache_json import validar_identificador
+from estructuras.lista_simple import ListaSimple
 from estructuras.cola import Cola
 from estructuras.vector_dinamico import Vector
 from estructuras.array_ordenado import ArrayOrdenado
@@ -104,6 +107,7 @@ def cargar_cripta(fuente, cripta_id, carpeta_cache=None):
     """
     persistencia = PersistenciaEsqueleto(carpeta_cache)
     # Validar el identificador antes de pasarlo a la fuente o al sistema de archivos.
+    validar_identificador(cripta_id)
     _exigir(isinstance(cripta_id, str) and bool(cripta_id.strip())
             and cripta_id not in ('.', '..') and not any(c in cripta_id for c in '/\\:'),
             'identificador inválido')
@@ -223,9 +227,10 @@ class ControladorRed:
         self._completar_lote(lote)
         if len(lote) == 0:
             return 0
+        self.ultimo_error = None
         try:
             return self.solicitar_contenido_lote(lote)
-        except RuntimeError as error:
+        except (RuntimeError, ValueError, OSError) as error:
             self.ultimo_error = f"Precarga de salas {self._texto_ids(lote)}: {error}"
             self.contador_precargas_fallidas += 1
             return 0
@@ -246,46 +251,76 @@ class ControladorRed:
 
         por_cargar = Vector()
         for sala_id in sala_ids:
+            if type(sala_id) is not int or sala_id < 0:
+                raise ValueError("El identificador de sala debe ser un entero no negativo.")
             if self._cripta.sala_por_id(sala_id) is None:
                 raise ValueError(f"La sala {sala_id} no existe en la cripta.")
-            if self.contenido_cargado(sala_id) or _contiene(por_cargar, sala_id):
-                continue
-            por_cargar.agregarValor(sala_id)
-            if not _contiene(self._encoladas, sala_id):
-                self._encoladas.agregarValor(sala_id)
-
+            if not self.contenido_cargado(sala_id) and not _contiene(por_cargar, sala_id):
+                por_cargar.agregarValor(sala_id)
         if len(por_cargar) == 0:
             return 0
+        try:
+            return self._cargar_lote(por_cargar)
+        except Exception:
+            # También protege las llamadas directas, no solo la precarga.
+            self._restaurar_lote(por_cargar)
+            raise
 
+    def _cargar_lote(self, por_cargar):
         datos_lote = Vector()     # pares (sala_id, datos) en el orden del lote
         faltantes = []            # list solo como parámetro del contrato de la fuente
         for sala_id in por_cargar:
             datos = self._pers_contenido.cargar(self._cripta.id, sala_id)
             if datos is not None:
-                self._validar_contenido(sala_id, datos)
-                self.contador_salas_desde_disco += 1
-                datos_lote.agregarValor((sala_id, datos))
-            else:
+                try:
+                    self._validar_contenido(sala_id, datos)
+                except ValueError:
+                    datos = None  # Una copia dañada se recupera desde la fuente.
+            if datos is None:
                 faltantes.append(sala_id)
+            else:
+                self.contador_salas_desde_disco += 1
+            datos_lote.agregarValor((sala_id, datos))
 
         if faltantes:
             respuesta = self._fuente.contenido_salas(self._cripta.id, faltantes)
             self.contador_solicitudes_contenido += 1
-            for sala_id in faltantes:
-                datos = self._buscar_en_respuesta(respuesta, sala_id)
-                self._pers_contenido.guardar(self._cripta.id, sala_id, datos)
-                datos_lote.agregarValor((sala_id, datos))
+            # Completar en el orden solicitado, no en el orden de red/disco.
+            for indice, (sala_id, datos) in enumerate(datos_lote):
+                if datos is None:
+                    datos = self._buscar_en_respuesta(respuesta, sala_id)
+                    datos_lote.asignarValor(indice, (sala_id, datos))
 
         # Todas las fichas del lote se resuelven juntas: menos solicitudes.
         self.resolver_catalogo(self._descubrir_tipos(datos_lote))
-
-        for sala_id, datos in datos_lote:
-            self._incorporar(self._cripta.sala_por_id(sala_id), datos)
-            self._incorporadas.agregarValor(sala_id)
-
-        return len(datos_lote)
+        preparadas = Vector()
+        siguiente_id = self._fabrica.siguiente_id
+        try:
+            for sala_id, datos in datos_lote:
+                sala = self._cripta.sala_por_id(sala_id)
+                try:
+                    preparadas.agregarValor((sala, self._incorporar(sala, datos)))
+                except ValueError:
+                    if sala_id not in faltantes:
+                        self._pers_contenido.invalidar(self._cripta.id, sala_id)
+                    raise
+            # Solo se persisten contenidos que pudieron construirse por completo.
+            for sala_id, datos in datos_lote:
+                if sala_id in faltantes:
+                    self._pers_contenido.guardar(self._cripta.id, sala_id, datos)
+        except Exception:
+            self._fabrica.siguiente_id = siguiente_id
+            raise
+        for sala, (enemigos, objetos, trampas) in preparadas:
+            sala.enemigos_dormidos = enemigos
+            sala.objetos_suelo = objetos
+            sala.trampas = trampas
+            self._incorporadas.agregarValor(sala.id)
+        return len(preparadas)
 
     def garantizar_contenido(self, sala_id):
+        if type(sala_id) is not int or sala_id < 0:
+            raise ValueError("El identificador de sala debe ser un entero no negativo.")
         sala = self._cripta.sala_por_id(sala_id)
         if sala is None:
             raise ValueError(f"La sala {sala_id} no existe en la cripta.")
@@ -303,6 +338,7 @@ class ControladorRed:
 
         sin_memoria = Vector()
         for tipo_id in tipo_ids:
+            validar_identificador(tipo_id)
             if self.ficha(tipo_id) is None and not _contiene(sin_memoria, tipo_id):
                 sin_memoria.agregarValor(tipo_id)
         if len(sin_memoria) == 0:
@@ -312,6 +348,11 @@ class ControladorRed:
         a_red = [] # list solo como parámetro del contrato de la fuente
         for tipo_id in sin_memoria:
             ficha = pers.cargar_ficha(tipo_id)
+            if ficha is not None:
+                try:
+                    self._validar_ficha(tipo_id, ficha)
+                except ValueError:
+                    ficha = None
             if ficha is not None:
                 self.contador_fichas_desde_disco += 1
                 self._fichas.insertar(tipo_id, ficha)
@@ -347,10 +388,19 @@ class ControladorRed:
         self._encoladas.agregarValor(sala_id)
         return True
 
+    def _restaurar_lote(self, lote):
+        """Reencola solamente salas pendientes que no estaban ya en la cola."""
+        for sala_id in lote:
+            self._encolar(sala_id)
+
     def _completar_lote(self, lote):
         """Saca de la cola hasta llenar el lote; salta las ya cargadas."""
         while len(lote) < self.MAX_LOTE and not self._pendientes.esta_vacia():
             sala_id = self._pendientes.desencolar()
+            for indice, encolada in enumerate(self._encoladas):
+                if encolada == sala_id:
+                    self._encoladas.eliminar(indice)
+                    break
             if self.contenido_cargado(sala_id) or _contiene(lote, sala_id):
                 continue
             lote.agregarValor(sala_id)
@@ -384,19 +434,23 @@ class ControladorRed:
             self._tipos_descubiertos.agregarValor(tipo_id)
 
     def _incorporar(self, sala, datos):
-        """crea las entidades de la sala. No activa enemigos ni programa eventos."""
+        """Prepara las entidades sin publicar cambios ni activar eventos."""
+        enemigos = ListaSimple()
+        objetos = ListaSimple()
+        trampas = ListaSimple()
         for e in datos["enemigos"]:
             ficha = self._ficha_de_clase(e["tipo"], ("enemigo",))
             enemigo = Enemigo.desde_ficha(e["instancia"], ficha, sala, e.get("vida"))
-            sala.enemigos_dormidos.insertar_al_final(enemigo)
+            enemigos.insertar_al_final(enemigo)
 
         for tipo_id in datos["objetos"]:
             ficha = self._ficha_de_clase(tipo_id, None)
-            sala.objetos_suelo.insertar_al_final(self._fabrica.crear(ficha))
+            objetos.insertar_al_final(self._fabrica.crear(ficha))
 
         for t in datos["trampas"]:
             ficha = self._ficha_de_clase(t["tipo"], ("trampa",))
-            sala.trampas.insertar_al_final(Trampa.desde_ficha(t["instancia"], ficha))
+            trampas.insertar_al_final(Trampa.desde_ficha(t["instancia"], ficha))
+        return enemigos, objetos, trampas
 
     def _ficha_de_clase(self, tipo_id, clases):
         ficha = self.ficha(tipo_id)
@@ -414,31 +468,85 @@ class ControladorRed:
         contenido = respuesta.get("contenido") if isinstance(respuesta, dict) else None
         if not isinstance(contenido, list):
             raise ValueError("Respuesta de contenido inválida.")
+        encontrada = None
         for datos in contenido:
             if isinstance(datos, dict) and datos.get("sala") == sala_id:
+                if encontrada is not None:
+                    raise ValueError(f"La respuesta repite la sala {sala_id}.")
                 self._validar_contenido(sala_id, datos)
-                return datos
-        raise ValueError(f"La respuesta no trajo el contenido de la sala {sala_id}.")
+                encontrada = datos
+        if encontrada is None:
+            raise ValueError(f"La respuesta no trajo el contenido de la sala {sala_id}.")
+        return encontrada
 
     @staticmethod
     def _validar_contenido(sala_id, datos):
-        if not isinstance(datos, dict) or datos.get("sala") != sala_id:
+        if (not isinstance(datos, dict) or type(datos.get('sala')) is not int
+                or datos['sala'] != sala_id):
             raise ValueError(f"Contenido de la sala {sala_id} inválido.")
         for campo in ("enemigos", "objetos", "trampas"):
             if not isinstance(datos.get(campo), list):
                 raise ValueError(f"Contenido de la sala {sala_id}: '{campo}' inválido.")
+        instancias = Vector()
         for entidad in datos["enemigos"] + datos["trampas"]:
-            if not isinstance(entidad, dict) or not isinstance(entidad.get("instancia"), str):
+            if (not isinstance(entidad, dict)
+                    or not isinstance(entidad.get("instancia"), str)
+                    or not entidad['instancia'].strip()):
                 raise ValueError(f"Contenido de la sala {sala_id}: instancia inválida.")
+            if _contiene(instancias, entidad['instancia']):
+                raise ValueError('Instancia repetida en el contenido de una sala.')
+            instancias.agregarValor(entidad['instancia'])
+            validar_identificador(entidad.get('tipo'))
+            vida = entidad.get('vida')
+            if vida is not None and (type(vida) not in (int, float)
+                                     or not isfinite(vida) or vida < 0):
+                raise ValueError('Vida de instancia inválida.')
+        for tipo_id in datos['objetos']:
+            validar_identificador(tipo_id)
+
+    def _validar_ficha(self, tipo_id, ficha):
+        if not isinstance(ficha, dict) or ficha.get('id') != tipo_id:
+            raise ValueError(f'Ficha {tipo_id} inválida.')
+        if not isinstance(ficha.get('nombre'), str) or not ficha['nombre'].strip():
+            raise ValueError(f'Ficha {tipo_id}: nombre inválido.')
+        siguiente_id = self._fabrica.siguiente_id
+        try:
+            clase = ficha.get('clase')
+            if clase == 'enemigo':
+                Enemigo.desde_ficha('validacion', ficha)
+                suelta = ficha.get('suelta', [])
+                if not isinstance(suelta, list):
+                    raise ValueError('suelta debe ser una lista de tipos.')
+                for tipo in suelta:
+                    validar_identificador(tipo)
+                regeneracion = ficha.get('regeneracion', 0)
+                if (type(regeneracion) not in (int, float)
+                        or not isfinite(regeneracion) or regeneracion < 0):
+                    raise ValueError('Regeneración inválida.')
+            elif clase == 'trampa':
+                Trampa.desde_ficha('validacion', ficha)
+            else:
+                self._fabrica.crear(ficha)
+        except (KeyError, TypeError) as error:
+            raise ValueError(f'Ficha {tipo_id} incompleta o inválida: {error}') from error
+        finally:
+            # Validar una ficha no consume identificadores de la partida.
+            self._fabrica.siguiente_id = siguiente_id
 
     def _buscar_ficha_en_respuesta(self, respuesta, tipo_id):
         entidades = respuesta.get("entidades") if isinstance(respuesta, dict) else None
         if not isinstance(entidades, list):
             raise ValueError("Respuesta de catálogo inválida.")
+        encontrada = None
         for ficha in entidades:
             if isinstance(ficha, dict) and ficha.get("id") == tipo_id:
-                return ficha
-        raise ValueError(f"El catálogo no trajo la ficha {tipo_id}.")
+                if encontrada is not None:
+                    raise ValueError(f'El catálogo repite la ficha {tipo_id}.')
+                self._validar_ficha(tipo_id, ficha)
+                encontrada = ficha
+        if encontrada is None:
+            raise ValueError(f"El catálogo no trajo la ficha {tipo_id}.")
+        return encontrada
 
     @staticmethod
     def _texto_ids(ids):
