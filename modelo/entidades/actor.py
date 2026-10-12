@@ -1,6 +1,8 @@
 """Estado y operaciones básicas compartidas por jugador y enemigos."""
 
 from math import isfinite
+from estructuras.lista_doble import ListaDoble
+from modelo.deltas import DeltaVida
 
 
 def _validar_numero(valor, nombre):
@@ -66,6 +68,12 @@ class Actor:
         self.vivo = vida > 0
         self.evento_actual = None
         self.tiempo_siguiente = 0
+        self._reloj = None
+        self.eventos_efectos = ListaDoble()
+
+    def _registrar_delta(self, delta):
+        if self._reloj is not None:
+            self._reloj.registrar(delta)
 
     def recibir_dano(self, cantidad):
         """Recibe daño ya calculado y devuelve la vida perdida."""
@@ -80,6 +88,7 @@ class Actor:
             return 0
 
         vida_anterior = self.vida
+        self._registrar_delta(DeltaVida(self))
         self.vida = max(0, self.vida - cantidad)
 
         if self.vida == 0:
@@ -100,15 +109,19 @@ class Actor:
             return 0
 
         vida_anterior = self.vida
+        self._registrar_delta(DeltaVida(self))
         self.vida = min(self.vida_max, self.vida + cantidad)
 
         return self.vida - vida_anterior
 
     def morir(self):
+        self._registrar_delta(DeltaVida(self))
         self.vida = 0
         self.vivo = False
 
-        if self.evento_actual is not None:
+        if self._reloj is not None:
+            self._reloj.cancelar_actor(self)
+        elif self.evento_actual is not None:
             # Es la entrada que devolvió insertarEntrada().
             self.evento_actual.valido = False
 

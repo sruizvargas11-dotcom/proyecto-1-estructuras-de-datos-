@@ -1,26 +1,22 @@
 4.1 - AGENDA DE EVENTOS
 (Redacta ROL 3, Revisa ROL 2)
 
+Borrador técnico, 12-10-2026. Revisión humana del rol indicado pendiente.
+
 1 - PROBLEMA
-¿Cual es la situación a resolver?
-¿Qué operaciones debería ejecutar el programa?
+Ejecutar actores y efectos por tiempo entero y secuencia. Cancelar sin recorrer toda la agenda, reprogramar velocidad y restaurar eventos al deshacer.
 
 2 - ALTERNATIVAS
-Al menos 2 opciones y la razón concreta por la que una o varias se descartaron
+Vector sin ordenar: inserción barata, extraer mínimo O(n). Vector ordenado: consulta O(1), inserción O(n). Heap propio: equilibra inserción/extracción O(log n); se conserva la implementación del compañero.
 
 3 - DECISIÓN
-Estrategia implementada y cómo se estructuró en el programa
+HeapMinimo sobre Vector; clave (tiempo, secuencia). Cancelación diferida y consulta física minimo O(1), con limpieza explícita antes de usarla. Reloj comparte un random.Random(semilla). Reprogramar cancela y crea seq nuevo; deshacer reintegra el mismo handle/seq, incluso si ya salió del heap. Los actores guardan sus propios efectos pendientes.
 
 4 - COMPLEJIDAD ALGORÍTMICA
-Por lo menos la de la operación más frecuente
+Consultar raíz O(1). Insertar O(log n) amortizado por el Vector; extraer O(log n) sin cancelados. Limpiar k cancelados O(k log n). Cancelar O(1), muerte O(e) para efectos del actor. Comparaciones y operaciones quedan contadas; restauraciones se distinguen de inserciones nuevas.
 
 5 - EVIDENCIA
-Tabla del --bench que incluya:
-• repeticiones
-• mediana de rendimiento
-• equipo utilizado
-1 para la alternativa utilizada y otra/s para la/s alternativa/s descartada/s
+tests/test_rol3_bloque3.py verifica 0,66,100,125,132,175; empates; reprogramación; límites; azar y cancelación. Historial prueba reintegración de eventos ya retirados. Suite completa: 408 aprobadas. Comparativa --bench, frecuencias y ciclo de 20 ms pendientes B4; no se presentan tiempos inventados.
 
 6 - LÍMITES
-Condiciones en las que la decisión deja de ser apropiada
-Incluir datos cuando sea posible
+Cancelar deja entradas internas hasta que alcancen la raíz. Medir acumulación con muchas reprogramaciones. No mutar directamente las claves/validez de los handles del reloj. Un callback recurrente no debe reprogramarse indefinidamente al mismo tiempo. La integración de callbacks por tipo para guardado corresponde al rol 1.

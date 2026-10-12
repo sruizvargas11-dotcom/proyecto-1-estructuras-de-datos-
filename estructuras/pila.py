@@ -2,7 +2,7 @@
 Pila (LIFO) con capacidad máxima fija. Al superar el límite, descarta automáticamente el
 elemento más antiguo (el fondo), no el que se intenta apilar. Construida sobre ListaDoble:
 apilar/desapilar usan el frente, y el descarte por límite usa el fondo. Para el historial de retroceso,
-cada elemento es un delta, nunca una copia completa.
+cada elemento es un grupo de deltas, nunca una copia completa.
 """
 
 from estructuras.lista_doble import ListaDoble

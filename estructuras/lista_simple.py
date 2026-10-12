@@ -97,6 +97,22 @@ class ListaSimple:
     def __iter__(self):
         return self.recorrer_valores()
 
+    def insertar_en(self, indice, valor):
+        """Inserta en una posición lógica; sirve para restaurar un objeto. O(n)."""
+        if type(indice) is not int or not 0 <= indice <= len(self):
+            raise IndexError("Posición inválida en la lista.")
+        if indice == 0:
+            return self.insertar_al_inicio(valor)
+        anterior = self._head
+        for _ in range(indice - 1):
+            anterior = anterior.siguiente
+        nodo = NodoSimple(valor)
+        nodo.siguiente = anterior.siguiente
+        anterior.siguiente = nodo
+        self._tamano += 1
+        self.contador_inserciones += 1
+        return nodo
+
     def a_lista_python(self):
         return list(self.recorrer_valores())
 
