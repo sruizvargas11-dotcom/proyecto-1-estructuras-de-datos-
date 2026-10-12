@@ -111,3 +111,106 @@ def cargar_cripta(fuente, cripta_id, carpeta_cache=None):
     persistencia.guardar_esqueleto(c)
     versiones.guardar_version_cripta(c.id, c.version)
     return c, False
+import os
+from persistencia.contenido import PersistenciaContenido
+from persistencia.catalogo import PersistenciaCatalogo
+
+
+class ControladorRed:
+
+    MAX_LOTE = 10
+
+    def __init__(self, fuente, carpeta_cache):
+        self._fuente    = fuente
+        self._cache     = carpeta_cache
+        self._encoladas = []
+
+
+    def _persistencia_contenido(self, version_cripta):
+        return PersistenciaContenido(self._cache, version_cripta)
+
+    def _persistencia_catalogo(self, version_catalogo):
+        return PersistenciaCatalogo(self._cache, version_catalogo)
+
+
+    def planificar_precarga(self, sala_actual, cripta_id, version_cripta):
+        """
+        Encola las salas vecinas de sala_actual que no están en caché.
+        Evita encolar salas ya encoladas o ya cargadas.
+        """
+        pers = self._persistencia_contenido(version_cripta)
+        for salida in sala_actual.salidas.recorrer_valores():
+            sala_id = salida.sala_destino_id
+            if sala_id in self._encoladas:
+                continue
+            if pers.cargar_contenido_sala(cripta_id, sala_id) is not None:
+                continue
+            self._encoladas.append(sala_id)
+
+    def procesar_cola(self, cripta_id, version_cripta):
+        """
+        Descarga las salas encoladas en lotes de hasta 10.
+        """
+        while self._encoladas:
+            lote = []
+            for i in range(self.MAX_LOTE):
+                if not self._encoladas:
+                    break
+                lote.append(self._encoladas.pop(0))
+            self._solicitar_contenido_lote(cripta_id, lote, version_cripta)
+
+
+    def _solicitar_contenido_lote(self, cripta_id, sala_ids, version_cripta):
+        """
+        Pide un lote de hasta 10 salas al servidor y las guarda en caché.
+        """
+        pers = self._persistencia_contenido(version_cripta)
+        datos = self._fuente.contenido_salas(cripta_id, sala_ids)
+        for sala in datos["contenido"]:
+            pers.guardar_contenido_sala(cripta_id, sala["sala"], sala)
+        return datos["contenido"]
+
+    def garantizar_contenido(self, cripta_id, sala_id, version_cripta):
+        """
+        Garantiza que el contenido de una sala está disponible.
+        Primero busca en caché. Si no está, pide al servidor.
+        El reloj virtual NO avanza durante esta espera.
+        """
+        pers = self._persistencia_contenido(version_cripta)
+        datos = pers.cargar_contenido_sala(cripta_id, sala_id)
+        if datos is not None:
+            return datos
+        respuesta = self._fuente.contenido_salas(cripta_id, [sala_id])
+        datos = respuesta["contenido"][0]
+        pers.guardar_contenido_sala(cripta_id, sala_id, datos)
+        return datos
+
+
+    def resolver_catalogo(self, tipo_ids, version_catalogo):
+        """
+        Resuelve fichas del catálogo.
+        Primero busca en caché. Pide al servidor solo las que faltan.
+        Las pide en lotes de hasta 10.
+        """
+        pers     = self._persistencia_catalogo(version_catalogo)
+        pendientes = []
+        fichas     = []
+
+        for tipo_id in tipo_ids:
+            ficha = pers.cargar_ficha(tipo_id)
+            if ficha is not None:
+                fichas.append(ficha)
+            else:
+                if tipo_id not in pendientes:
+                    pendientes.append(tipo_id)
+
+        inicio = 0
+        while inicio < len(pendientes):
+            lote     = pendientes[inicio:inicio + self.MAX_LOTE]
+            respuesta = self._fuente.catalogo(lote)
+            for ficha in respuesta["entidades"]:
+                pers.guardar_ficha(ficha["id"], ficha)
+                fichas.append(ficha)
+            inicio += self.MAX_LOTE
+
+        return fichas
