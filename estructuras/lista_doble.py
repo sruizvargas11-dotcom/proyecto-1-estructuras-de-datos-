@@ -121,6 +121,37 @@ class ListaDoble:
 
         return nodo.valor
 
+    def restaurar_nodo(self, nodo, anterior=None, siguiente=None):
+        """Reintegra el mismo nodo al deshacer, sin invalidar otros handles.
+
+        Prefiere el vecino siguiente, luego el anterior. Si ambos desaparecieron
+        (por ejemplo un pergamino consumido), lo coloca al frente. O(1).
+        """
+        if nodo._propietario is not None and nodo._propietario is not self:
+            raise ValueError("El nodo pertenece a otra lista.")
+        if nodo is anterior or nodo is siguiente:
+            raise ValueError("Un nodo no puede ser su propio vecino.")
+        if self.pertenece(nodo):
+            self.eliminar_nodo(nodo)
+        if self.pertenece(siguiente):
+            anterior = siguiente.anterior
+        elif self.pertenece(anterior):
+            siguiente = anterior.siguiente
+        else:
+            anterior, siguiente = None, self._head
+        nodo.anterior, nodo.siguiente = anterior, siguiente
+        nodo._propietario = self
+        if anterior is None:
+            self._head = nodo
+        else:
+            anterior.siguiente = nodo
+        if siguiente is None:
+            self._cola = nodo
+        else:
+            siguiente.anterior = nodo
+        self._tamano += 1
+        self.contador_inserciones += 1
+
     def mover_al_frente(self, nodo):
         """Reordena un nodo ya existente para que quede primero, sin crear un nodo nuevo. O(1)."""
         self._validar_nodo(nodo)

@@ -12,6 +12,8 @@ class _EntradaHeap:
         self.secuencia = secuencia
         self.dato = dato
         self.valido = True
+        self._propietario = None
+        self._en_heap = False
 
     def clave(self):
         return (self.tiempo, self.secuencia)
@@ -30,12 +32,49 @@ class HeapMinimo:
         self.contador_cancelaciones = 0
         self.contador_reprogramaciones = 0
         self.contador_descartes_cancelados = 0
+        self.contador_consultas_minimo = 0
+        self.contador_limpiezas = 0
+        self.contador_restauraciones = 0
 
     def __len__(self):
         return len(self._datos)
 
     def esta_vacio(self):
         return len(self._datos) == 0
+
+    def minimo(self):
+        """
+        Consulta la entrada de la raíz sin extraerla: O(1).
+        Devuelve None si el heap está vacío.
+        Puede devolver una entrada cancelada; para obtener el próximo
+        evento válido, llamar antes a descartar_cancelados().
+        """
+        self.contador_consultas_minimo += 1
+        if self.esta_vacio():
+            return None
+
+        return self._datos.obtenerValor(0)
+
+    def descartar_cancelados(self):
+        """
+        Retira únicamente las entradas canceladas que llegan a la raíz.
+        Devuelve cuántas retiró. No extrae ninguna entrada válida.
+        Si descarta k entradas, cuesta O(k log n); sin descartes, O(1).
+        """
+        self.contador_limpiezas += 1
+        descartados = 0
+
+        while not self.esta_vacio():
+            raiz = self._datos.obtenerValor(0)
+
+            if raiz.valido:
+                break
+
+            self._quitar_raiz()
+            self.contador_descartes_cancelados += 1
+            descartados += 1
+
+        return descartados
 
     def insertarEntrada(self, tiempo, dato):
         """
@@ -44,11 +83,14 @@ class HeapMinimo:
         if type(tiempo) is not int or tiempo < 0:
             raise ValueError("El tiempo debe ser un entero no negativo.")
         entrada = _EntradaHeap(tiempo, self._siguiente_secuencia, dato)
+        entrada._propietario = self
+        entrada._en_heap = True
         self._siguiente_secuencia += 1
         self._datos.agregarValor(entrada)
         self._flotar(len(self._datos) - 1)
         self._contador_inserciones += 1
         return entrada
+
     def invalidarEntrada(self, entrada):
         """
         Cancela un evento sin tocar el heap por dentro.
@@ -72,19 +114,47 @@ class HeapMinimo:
         descartan automáticamente en el camino.
         """
 
+        entrada = self.extraer_entrada()
+        return None if entrada is None else entrada.dato
+
+    def extraer_entrada(self):
+        """Como extraer_minimo, conservando tiempo, secuencia y referencia."""
         self.contador_intentos_extraccion += 1
         while not self.esta_vacio():
             raiz = self._datos.obtenerValor(0)
             self._quitar_raiz()
             if raiz.valido:
                 self._contador_extracciones += 1
-                return raiz.dato
+                return raiz
             self.contador_descartes_cancelados += 1
 
         return None
+
+    @property
+    def siguiente_secuencia(self):
+        return self._siguiente_secuencia
+
+    def restaurar_secuencia(self, secuencia):
+        """Solo para deshacer, después de cancelar las inserciones revertidas."""
+        if type(secuencia) is not int or secuencia < 0:
+            raise ValueError("La secuencia debe ser un entero no negativo.")
+        self._siguiente_secuencia = secuencia
+
+    def restaurarEntrada(self, entrada):
+        """Deshacer restaura el mismo handle y seq; reprogramar crea otro."""
+        if entrada._propietario is not self:
+            raise ValueError("La entrada no pertenece a este heap.")
+        self.contador_restauraciones += 1
+        if not entrada._en_heap:
+            self._datos.agregarValor(entrada)
+            entrada._en_heap = True
+            self._flotar(len(self._datos) - 1)
+        entrada.valido = True
+
     # -- operaciones internas del heap.
 
     def _quitar_raiz(self):
+        self._datos.obtenerValor(0)._en_heap = False
         ultima_posicion = len(self._datos) - 1
         ultimo = self._datos.obtenerValor(ultima_posicion)
         self._datos.eliminarUltimo()
@@ -146,4 +216,7 @@ class HeapMinimo:
             ("reprogramaciones", self.contador_reprogramaciones),
             ("descartes_cancelados", self.contador_descartes_cancelados),
             ("comparaciones", self.contador_comparaciones),
+            ("consultas_minimo", self.contador_consultas_minimo),
+            ("limpiezas", self.contador_limpiezas),
+            ("restauraciones", self.contador_restauraciones),
         )

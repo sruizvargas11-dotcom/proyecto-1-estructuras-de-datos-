@@ -25,6 +25,7 @@ class Trampa:
             )
 
         self.armada = True
+        self.evento_rearme = None
 
     def activar(self, actor):
         """Aplica daño una vez y devuelve la vida realmente perdida."""

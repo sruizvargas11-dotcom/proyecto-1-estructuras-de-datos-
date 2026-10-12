@@ -3,6 +3,7 @@
 from estructuras.lista_doble import ListaDoble
 from estructuras.vector_dinamico import Vector
 from estructuras.ordenamientos import ordenar
+from modelo.deltas import DeltaObjeto
 
 from modelo.entidades.actor import Actor
 from modelo.entidades.objetos.arma import Arma
@@ -68,8 +69,11 @@ class Jugador(Actor):
         if self.sala_actual is None:
             return False
 
+        delta = DeltaObjeto(self, objeto)
         if not self.sala_actual.objetos_suelo.eliminar_valor(objeto):
             return False
+
+        self._registrar_delta(delta)
 
         nodo = self.inventario.insertar_al_final(objeto)
 
@@ -109,6 +113,8 @@ class Jugador(Actor):
             )
 
         objeto = nodo.valor
+
+        self._registrar_delta(DeltaObjeto(self, objeto, nodo))
 
         if objeto is self.arma_equipada:
             self.ataque -= objeto.ataque_bonus
@@ -155,6 +161,9 @@ class Jugador(Actor):
             )
 
         objeto = nodo.valor
+
+        if isinstance(objeto, (Arma, Armadura)):
+            self._registrar_delta(DeltaObjeto(self, objeto, nodo))
 
         if isinstance(objeto, Arma):
             if self.arma_equipada is not None:
