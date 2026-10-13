@@ -1,4 +1,5 @@
 from pathlib import Path
+from persistencia.cache_json import validar_identificador
 
 
 class PersistenciaVersiones:
@@ -26,13 +27,7 @@ class PersistenciaVersiones:
         return self._leer(ruta, version_actual)
 
     def _ruta_cripta(self, cripta_id):
-        if not isinstance(cripta_id, str) or not cripta_id.strip():
-            raise ValueError("El identificador debe ser un texto no vacío.")
-
-        if cripta_id in (".", "..") or any(
-            caracter in cripta_id for caracter in '/\\:'
-        ):
-            raise ValueError("El identificador no puede contener una ruta.")
+        validar_identificador(cripta_id)
 
         return self._carpeta_base / cripta_id / "version.txt"
 

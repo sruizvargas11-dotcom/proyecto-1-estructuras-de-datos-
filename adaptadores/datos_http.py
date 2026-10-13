@@ -33,7 +33,7 @@ class DatosHTTP(FuenteDeDatos):
         reintentos = 0
         while True:
             if self._presupuesto is not None and self._contador >= self._presupuesto:
-                raise RuntimeError("Presupuesto de solicitudes agotado.")
+                raise RuntimeError(f"Presupuesto de solicitudes agotado al consultar GET {ruta}.")
             self._contador += 1
             try:
                 respuesta = requests.get(
@@ -51,9 +51,9 @@ class DatosHTTP(FuenteDeDatos):
 
             if respuesta.status_code == 429:
                 if reintentos >= self._max_reintentos:
-                    raise RuntimeError("El servidor sigue ocupado: límite de reintentos alcanzado.")
+                    raise RuntimeError(f"GET {ruta}: el servidor sigue ocupado; límite de reintentos alcanzado.")
                 if self._presupuesto is not None and self._contador >= self._presupuesto:
-                    raise RuntimeError("Presupuesto de solicitudes agotado.")
+                    raise RuntimeError(f"Presupuesto de solicitudes agotado al consultar GET {ruta}.")
                 datos = respuesta.json()
                 espera = datos.get("reintentar_en", 5) if isinstance(datos, dict) else None
                 if type(espera) not in (int, float) or not 0 <= espera <= 60:

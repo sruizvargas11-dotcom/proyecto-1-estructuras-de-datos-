@@ -1,26 +1,23 @@
 4.5 - INVENTARIO
 (Redacta ROL 2, Revisa ROL 3)
 
+Borrador técnico B2, 11-10-2026. Revisión automatizada ejecutada; revisión humana del rol indicado pendiente.
+
 1 - PROBLEMA
-¿Cual es la situación a resolver?
-¿Qué operaciones debería ejecutar el programa?
+Recoger, seleccionar, equipar y soltar objetos conservando una selección válida y el límite recibido de la fuente.
 
 2 - ALTERNATIVAS
-Al menos 2 opciones y la razón concreta por la que una o varias se descartaron
+Vector: acceso por índice rápido, pero borrar un objeto intermedio desplaza elementos. Lista simple: eliminar necesita conocer el anterior y retroceder no es directo. Lista doble: permite navegar ambos sentidos y eliminar el nodo seleccionado sin buscarlo.
 
 3 - DECISIÓN
-Estrategia implementada y cómo se estructuró en el programa
+Jugador mantiene ListaDoble y cursor al nodo. soltar_actual delega en soltar_nodo; equipar mueve el nodo al frente. La vista ordenada se construye en un Vector separado y no reordena el inventario real. Recoger lleno devuelve False antes de retirar el objeto del suelo. Aplicar costos de tiempo pertenece al controlador del B3.
 
 4 - COMPLEJIDAD ALGORÍTMICA
-Por lo menos la de la operación más frecuente
+Avanzar/retroceder cursor, soltar nodo conocido y equipar nodo: O(1). Buscar por instancia: O(n). Recoger incluye búsqueda de duplicados y retirada del suelo: O(n+s), donde s es objetos del suelo. Copiar vista: O(n); ordenar depende del algoritmo elegido. Espacio del inventario O(n).
 
 5 - EVIDENCIA
-Tabla del --bench que incluya:
-• repeticiones
-• mediana de rendimiento
-• equipo utilizado
-1 para la alternativa utilizada y otra/s para la/s alternativa/s descartada/s
+tests/test_bloque2_entidades.py y tests/test_contadores_estructuras.py verifican cursor, pertenencia de nodos, equipo, capacidad, transferencia de objetos y estructuras. La suite completa tiene 345 pruebas aprobadas.
+Tabla comparativa --bench para 10, 50 y 500 objetos: pendiente. Se medirán repeticiones, mediana y equipo; no se deduce velocidad real solo de O(1).
 
 6 - LÍMITES
-Condiciones en las que la decisión deja de ser apropiada
-Incluir datos cuando sea posible
+El beneficio O(1) exige referencia al nodo. soltar(id) primero busca O(n). Cada nodo agrega referencias anterior/siguiente. Costos virtuales y rechazo sin avanzar reloj deben integrarse y probarse con el motor en B3.

@@ -19,4 +19,5 @@ class Salida:
         self.cerrada = cerrada
         self.llave = llave
         self.cierre_automatico = cierre_automatico
+        self.evento_cierre = None
 
