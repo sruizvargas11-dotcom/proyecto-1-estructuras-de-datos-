@@ -1,26 +1,49 @@
 4.3 - RESOLUCIÓN DE REFERENCIAS DEL CATÁLOGO
 (Redacta ROL 2, Revisa ROL 4)
 
+Borrador técnico B3, 13-10-2026. Revisión humana del rol indicado pendiente.
+
 1 - PROBLEMA
-¿Cual es la situación a resolver?
-¿Qué operaciones debería ejecutar el programa?
+El contenido de una sala trae tipo_id de texto (ent_rata_gigante, itm_daga_oxidada); resolver cada instancia a su ficha completa (vida_max, ataque, suelta, etc.)
+es una de las operaciones más frecuentes del juego, porque se ejecuta al incorporar cada sala y cada vez que el modelo necesita leer un atributo
+compartido de un enemigo u objeto. El enunciado exige además que una ficha referenciada por una instancia activa no pueda liberarse de memoria
+mientras esa instancia exista.
 
 2 - ALTERNATIVAS
-Al menos 2 opciones y la razón concreta por la que una o varias se descartaron
+ArrayOrdenado con búsqueda binaria (usado como provisional en B2): O(log f) por búsqueda, pero crece sin tope mientras el catálogo
+descubierto crezca, y no tiene noción de protección por uso ni de desalojo. ListaLRU sobre ListaDoble propia: localizar es O(k) acotado
+por capacidad en vez de O(log f), pero incorpora la política de desalojo y el contador en_uso que el ArrayOrdenado no podía ofrecer sin
+dict. Se descarta el ArrayOrdenado para este servicio porque el requisito central de B3 no es solo resolver rápido, es resolver sin agotar
+memoria ni red cuando la cripta crece; se adopta ListaLRU con capacidad configurable (--cache-size, 25 por defecto).
 
 3 - DECISIÓN
-Estrategia implementada y cómo se estructuró en el programa
+ControladorRed._fichas pasa de ArrayOrdenado a ListaLRU(capacidad=cache_size). ficha(tipo_id) usa ListaLRU.buscar(), que mueve la entrada
+al frente en cada acierto. Al incorporar el contenido de una sala (_incorporar), cada enemigo creado marca en_uso en su ficha
+automáticamente, porque un enemigo vivo protege su ficha sin importar en qué sala esté (Sec. 4.4). ROL 4 debe llamar ControladorRed.notificar_muerte_enemigo(enemigo)
+exactamente cuando enemigo.vivo pase a False; sin esa llamada la ficha queda protegida indefinidamente.
+La protección de objetos (inventario o suelo de la sala actual) y de trampas (sala actual) queda fuera de este incremento:
+el enunciado la limita a la sala donde está parado el jugador, no a cualquier sala cargada, y esa noción de "sala actual" todavía no existe
+porque el bucle de movimiento es trabajo de ROL 4 (ver ROL3_BLOQUE3.md). Marcar esas fichas en_uso en toda sala incorporada sería incorrecto: impediría desalojar fichas de salas que el jugador ya no visita. Queda como contrato pendiente para cuando exista el movimiento.
 
 4 - COMPLEJIDAD ALGORÍTMICA
-Por lo menos la de la operación más frecuente
+Operación más frecuente: ficha(tipo_id) vía ListaLRU.buscar(). Recorrido lineal O(k) con k = capacidad de la caché (constante, no crece con el tamaño de la cripta).
+Un acierto mueve el nodo al frente en O(1) adicional. marcar_en_uso/desmarcar_en_uso también son O(k) porque localizan el nodo de la misma
+forma que buscar().
 
 5 - EVIDENCIA
-Tabla del --bench que incluya:
-• repeticiones
-• mediana de rendimiento
-• equipo utilizado
-1 para la alternativa utilizada y otra/s para la/s alternativa/s descartada/s
+tests/test_catalogo_lru.py (6 casos nuevos): el catálogo es una ListaLRU real; resolver_catalogo deja la ficha disponible; una ficha
+inexistente da None; incorporar una sala marca en_uso a sus enemigos automáticamente; con capacidad 3, una ficha protegida sobrevive
+un cuarto tipo que fuerza desalojo; dos instancias del mismo tipo (sala_2 trae dos ratas gigantes) requieren notificar la muerte de
+ambas antes de liberar la ficha. Suite completa: 430 pruebas aprobadas (424 previas de B1/B2/B3 + 6 nuevas), 
+sin tocar tests/test_bloque3.py que depende de un módulo de ROL 1 (persistencia.PartidaBinaria) todavía no publicado. 
+Tabla --bench con repeticiones, mediana y equipo: pendiente B4, igual que para 4.4.
 
 6 - LÍMITES
-Condiciones en las que la decisión deja de ser apropiada
-Incluir datos cuando sea posible
+Con cache_size menor que la cantidad de tipos distintos que trae una sola sala, resolver_catalogo puede desalojar una ficha
+antes de que _incorporar la necesite, porque el marcado en_uso ocurre después de resolver, no durante: una sala con 3 tipos
+distintos y cache_size=1 falla al incorporar (RuntimeError). Esto se descubrió probando la integración y se documenta aquí en
+vez de ocultarse subiendo el tamaño de caché de la prueba sin más: en partidas reales, --cache-size por defecto (25) es muy superior
+a los tipos distintos de una sala típica, así que no se espera que ocurra, pero el límite es real y queda sin resolver automáticamente.
+La protección de objetos y trampas por sala actual no está implementada todavía (punto 3): hasta que ROL 4 conecte el movimiento, 
+esas fichas nunca se marcan en_uso y son desalojables en cualquier momento, lo cual es seguro pero no cumple todavía el requisito completo
+de 4.4 para esos dos casos.

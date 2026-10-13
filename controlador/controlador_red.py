@@ -21,6 +21,7 @@ from estructuras.lista_simple import ListaSimple
 from estructuras.cola import Cola
 from estructuras.vector_dinamico import Vector
 from estructuras.array_ordenado import ArrayOrdenado
+from estructuras.listalru import ListaLRU
 
 def _exigir(condicion, mensaje):
     if not condicion:
@@ -148,7 +149,7 @@ class ControladorRed:
     MAX_LOTE = 10
 
     def __init__(self, fuente, cripta, carpeta_cache=None, fabrica=None,
-                 version_catalogo=None):
+                 version_catalogo=None, cache_size = 25):
         self._fuente = fuente
         self._cripta = cripta
         self._cache = carpeta_cache if carpeta_cache is not None else _carpeta_cache_por_defecto()
@@ -160,7 +161,7 @@ class ControladorRed:
         self._pendientes = Cola()
         self._encoladas = Vector()
         self._incorporadas = Vector()
-        self._fichas = ArrayOrdenado()
+        self._fichas = ListaLRU(capacidad = cache_size)
         self._tipos_descubiertos = Vector()
 
         self._pers_contenido = PersistenciaContenido(self._cache, cripta.version)
@@ -182,8 +183,16 @@ class ControladorRed:
         return len(self._pendientes)
 
     def ficha(self, tipo_id):
-        """Ficha ya resuelta, o None. O(log n)."""
-        return self._fichas.busqueda_binaria(tipo_id)
+        """Ficha ya resuelta, o None. O(k) acotado por cache_size: busca en
+        la ListaLRU sin recorrer todo el catálogo, solo lo que está en memoria."""
+        return self._fichas.buscar(tipo_id)
+    
+    def notificar_muerte_enemigo(self, enemigo):
+        """ROL 4 DEBE llamar esto justo cuando enemigo.vivo pase a False
+        (por ejemplo, justo después de Actor.recibir_dano/morir), para que
+        su ficha deje de estar protegida y vuelva a ser candidata a desalojo.
+        Sin esta llamada, la ficha queda protegida para siempre."""
+        self._fichas.desmarcar_en_uso(enemigo.tipo_id)
 
     def tipos_descubiertos(self):
         """tipo_ids en el orden en que aparecieron en el contenido."""
@@ -442,14 +451,22 @@ class ControladorRed:
             ficha = self._ficha_de_clase(e["tipo"], ("enemigo",))
             enemigo = Enemigo.desde_ficha(e["instancia"], ficha, sala, e.get("vida"))
             enemigos.insertar_al_final(enemigo)
+            # Un enemigo vivo protege su ficha sin importar la sala.
+            # ROL 4 debe llamar notificar_muerte_enemigo(enemigo) cuando muera.
+            self._fichas.marcar_en_uso(e["tipo"])
 
         for tipo_id in datos["objetos"]:
             ficha = self._ficha_de_clase(tipo_id, None)
             objetos.insertar_al_final(self._fabrica.crear(ficha))
+            # Un objeto solo protege su ficha si queda en el inventario o en
+            # el suelo de la sala ACTUAL (Sec. 4.4), no de cualquier sala
+            # cargada. Esa decisión depende del bucle de movimiento (ROL 4)
+            # y no se marca aquí todavía: ver docs/decisiones/4.03.txt.
 
         for t in datos["trampas"]:
             ficha = self._ficha_de_clase(t["tipo"], ("trampa",))
             trampas.insertar_al_final(Trampa.desde_ficha(t["instancia"], ficha))
+            # Misma razón que los objetos: solo protege si es la sala actual.
         return enemigos, objetos, trampas
 
     def _ficha_de_clase(self, tipo_id, clases):
