@@ -1,148 +1,174 @@
+"""Efectos temporales reales.
 
-"""Efectos temporales y periódicos de los actores."""
+Construye sobre Reloj.programar_en/cancelar y los deltas existentes; no copia
+la partida ni mantiene su propio registro paralelo de reversión. Cada función
+es un primitivo reutilizable: no decide QUIÉN aplica un veneno ni con qué
+daño, eso lo conecta quien tenga la ficha concreta (una trampa mediante el
+`aplicar_efecto` de Entorno, el ataque de un enemigo, una poción). Así se
+respeta la instrucción de ROL3_BLOQUE3.md de no inventar esas reglas al
+conectar callbacks.
+
+Políticas abiertas que SÍ quedan fijadas aquí (documentadas en
+docs/decisiones/4.06.txt, pendiente de revisión del equipo):
+
+- Reaplicar veneno mientras ya está activo reinicia el conteo de pulsos
+  completo con el nuevo daño (no se suman ni se promedian duraciones).
+- El pulso que cae exactamente en t+400 SÍ se ejecuta: con intervalo 80 y
+  duración 400 hay 5 pulsos (80, 160, 240, 320, 400); el límite es inclusivo.
+- Un antídoto antes del próximo pulso cancela esa agenda; el pulso ya no
+  ocurre porque la entrada del heap queda inválida antes de ejecutarse.
+"""
+from modelo.deltas import DeltaAtributos
+from modelo.reloj import entero
 
 INTERVALO_VENENO = 80
 DURACION_VENENO = 400
+PULSOS_VENENO = DURACION_VENENO // INTERVALO_VENENO  # 5
+
+
+class EstadoVeneno:
+    """Daño y pulsos restantes del veneno activo. No es la agenda del reloj."""
+
+    def __init__(self, dano_por_pulso, pulsos_restantes):
+        self.dano_por_pulso = dano_por_pulso
+        self.pulsos_restantes = pulsos_restantes
+
+
+def _entrada_pendiente(entrada):
+    return entrada is not None and entrada.valido and entrada._en_heap
+
+
+def aplicar_veneno(reloj, actor, dano_por_pulso, pulsos=PULSOS_VENENO,
+                    intervalo=INTERVALO_VENENO):
+    """Envenena a actor; si ya estaba envenenado, reinicia el conteo (política
+    de reaplicación fijada arriba). dano_por_pulso lo decide quien llama.
+    """
+    entero(dano_por_pulso, 'daño del veneno', 1)
+    entero(pulsos, 'pulsos de veneno', 1)
+    entero(intervalo, 'intervalo de veneno', 1)
+    if not actor.vivo:
+        return False
+    reloj.vincular_actor(actor)
+    if _entrada_pendiente(actor.evento_veneno):
+        reloj.cancelar(actor.evento_veneno)
+    reloj.registrar(DeltaAtributos(actor, 'estado_veneno'))
+    actor.estado_veneno = EstadoVeneno(dano_por_pulso, pulsos)
+    _programar_pulso_veneno(reloj, actor, intervalo)
+    return True
+
+
+def _programar_pulso_veneno(reloj, actor, intervalo):
+    tiempo = reloj.tiempo_actual + intervalo
+
+    def pulso(reloj):
+        estado = actor.estado_veneno
+        if estado is None or not actor.vivo:
+            return
+        restantes = estado.pulsos_restantes - 1
+        reloj.registrar(DeltaAtributos(actor, 'estado_veneno'))
+        actor.estado_veneno = (
+            EstadoVeneno(estado.dano_por_pulso, restantes) if restantes > 0 else None
+        )
+        actor.recibir_dano(estado.dano_por_pulso)
+        if restantes > 0 and actor.vivo:
+            _programar_pulso_veneno(reloj, actor, intervalo)
+
+    reloj.programar_en(tiempo, pulso, tipo='veneno', dueno=actor,
+                        campo='evento_veneno', efecto=True)
+
+
+def cancelar_veneno(reloj, actor):
+    """Antídoto u otro efecto que cure el veneno antes del próximo pulso."""
+    if not _entrada_pendiente(actor.evento_veneno):
+        return False
+    reloj.cancelar(actor.evento_veneno)
+    reloj.registrar(DeltaAtributos(actor, 'estado_veneno'))
+    actor.estado_veneno = None
+    return True
+
+# --------------------------------------------------------------------------- 
+# Cambio temporal de velocidad
+# ---------------------------------------------------------------------------
+
+def aplicar_modificador_velocidad(reloj, actor, modificador, duracion):
+    """Aplica un modificador de velocidad temporal (Sec. 2.3 y 2.10): el
+    inicio Y el fin reajustan la próxima acción mediante
+    reprogramar_por_velocidad, nunca una asignación directa.
+    """
+    entero(duracion, 'duración del modificador', 1)
+    if not actor.vivo:
+        return False
+    if _entrada_pendiente(actor.evento_mod_velocidad):
+        raise ValueError(
+            'Ya hay un modificador de velocidad activo; cancélalo antes de aplicar otro.'
+        )
+    velocidad_original = actor.velocidad
+    nueva = velocidad_original + modificador
+    if nueva < 1:
+        raise ValueError('El modificador deja la velocidad en cero o negativa.')
+
+    reloj.reprogramar_por_velocidad(actor, nueva)
+
+    tiempo = reloj.tiempo_actual + duracion
+
+    def fin(reloj):
+        if actor.vivo:
+            reloj.reprogramar_por_velocidad(actor, velocidad_original)
+
+    reloj.programar_en(tiempo, fin, tipo='fin_modificador_velocidad', dueno=actor,
+                        campo='evento_mod_velocidad', efecto=True)
+    return True
+
+# --------------------------------------------------------------------------- 
+# Antorcha
+# ---------------------------------------------------------------------------
+
+def encender_antorcha(reloj, antorcha):
+    """Enciende la antorcha y programa su propio apagado tras `duracion`."""
+    if antorcha.encendida or _entrada_pendiente(antorcha.evento_apagado):
+        return False
+    reloj.registrar(DeltaAtributos(antorcha, 'encendida'))
+    antorcha.encendida = True
+
+    tiempo = reloj.tiempo_actual + antorcha.duracion
+
+    def apagar(reloj):
+        reloj.registrar(DeltaAtributos(antorcha, 'encendida'))
+        antorcha.encendida = False
+
+    reloj.programar_en(tiempo, apagar, tipo='apagado_antorcha', dueno=antorcha,
+                        campo='evento_apagado', efecto=False)
+    return True
+
+
+# --------------------------------------------------------------------------- 
+# Regeneración
+# ---------------------------------------------------------------------------
+
 INTERVALO_REGENERACION = 200
 
 
-def _validar_entero(valor, nombre, minimo=0):
-    """Valida valores enteros usados por los efectos."""
-    if type(valor) is not int or valor < minimo:
-        raise ValueError(f"{nombre} debe ser un entero >= {minimo}.")
+def iniciar_regeneracion(reloj, enemigo):
+    """Activa la regeneración periódica de un enemigo con ficha.regeneracion
+    > 0. Se llama explícitamente al activar al enemigo (Partida), no al
+    crearlo: antes de eso no hay reloj corriendo donde programar el pulso.
+    """
+    if enemigo.regeneracion <= 0 or not enemigo.vivo:
+        return False
+    if _entrada_pendiente(enemigo.evento_regeneracion):
+        return False
+    _programar_pulso_regeneracion(reloj, enemigo)
+    return True
 
 
-def aplicar_veneno(actor, reloj, dano):
-    """Inflige daño cada 80 unidades durante 400 unidades."""
-    _validar_entero(dano, "El daño", 0)
+def _programar_pulso_regeneracion(reloj, enemigo):
+    tiempo = reloj.tiempo_actual + INTERVALO_REGENERACION
 
-    if not actor.vivo:
-        return
-
-    tiempo_final = reloj.tiempo_actual + DURACION_VENENO
-
-    def ejecutar_veneno(reloj_actual):
-        if not actor.vivo:
+    def pulso(reloj):
+        if not enemigo.vivo:
             return
+        enemigo.curar(enemigo.regeneracion)  # ya topa en vida_max y registra delta
+        _programar_pulso_regeneracion(reloj, enemigo)
 
-        actor.recibir_dano(dano)
-
-        siguiente = reloj_actual.tiempo_actual + INTERVALO_VENENO
-
-        if siguiente <= tiempo_final and actor.vivo:
-            reloj_actual.programar_en(
-                siguiente,
-                ejecutar_veneno,
-                tipo="veneno",
-                dueno=actor,
-                efecto=True,
-            )
-
-    reloj.programar_en(
-        reloj.tiempo_actual + INTERVALO_VENENO,
-        ejecutar_veneno,
-        tipo="veneno",
-        dueno=actor,
-        efecto=True,
-    )
-
-
-def cancelar_veneno(actor, reloj):
-    """Cancela todos los eventos de veneno pendientes del actor."""
-    nodo = actor.eventos_efectos.head()
-
-    while nodo is not None:
-        siguiente = nodo.siguiente
-        entrada = nodo.valor
-
-        if entrada.dato.tipo == "veneno":
-            reloj.cancelar(entrada)
-
-        nodo = siguiente
-
-
-def aplicar_regeneracion(actor, reloj, cantidad, duracion):
-    """Cura al actor cada 200 unidades hasta finalizar la duración."""
-    _validar_entero(cantidad, "La cantidad de regeneración", 0)
-    _validar_entero(duracion, "La duración", 1)
-
-    if not actor.vivo:
-        return
-
-    tiempo_final = reloj.tiempo_actual + duracion
-
-    def ejecutar_regeneracion(reloj_actual):
-        if not actor.vivo:
-            return
-
-        actor.curar(cantidad)
-
-        siguiente = reloj_actual.tiempo_actual + INTERVALO_REGENERACION
-
-        if siguiente <= tiempo_final and actor.vivo:
-            reloj_actual.programar_en(
-                siguiente,
-                ejecutar_regeneracion,
-                tipo="regeneracion",
-                dueno=actor,
-                efecto=True,
-            )
-
-    reloj.programar_en(
-        reloj.tiempo_actual + INTERVALO_REGENERACION,
-        ejecutar_regeneracion,
-        tipo="regeneracion",
-        dueno=actor,
-        efecto=True,
-    )
-
-
-def aplicar_velocidad(actor, reloj, modificador, duracion):
-    """Modifica temporalmente la velocidad y luego la restaura."""
-    if type(modificador) not in (int, float):
-        raise ValueError("El modificador debe ser numérico.")
-
-    _validar_entero(duracion, "La duración", 1)
-
-    if not actor.vivo or modificador == 0:
-        return
-
-    velocidad_anterior = actor.velocidad
-    nueva_velocidad = velocidad_anterior + modificador
-
-    if nueva_velocidad <= 0:
-        raise ValueError("La velocidad resultante debe ser positiva.")
-
-    reloj.reprogramar_por_velocidad(actor, nueva_velocidad)
-
-    def restaurar_velocidad(reloj_actual):
-        if actor.vivo:
-            reloj_actual.reprogramar_por_velocidad(
-                actor,
-                velocidad_anterior,
-            )
-
-    reloj.programar_en(
-        reloj.tiempo_actual + duracion,
-        restaurar_velocidad,
-        tipo="restaurar_velocidad",
-        dueno=actor,
-        efecto=True,
-    )
-
-
-def usar_pocion(actor, pocion, reloj):
-    """Aplica la curación y el modificador de una poción."""
-    if not actor.vivo:
-        return
-
-    if pocion.cura > 0:
-        actor.curar(pocion.cura)
-
-    if pocion.modificador_velocidad != 0:
-        aplicar_velocidad(
-            actor,
-            reloj,
-            pocion.modificador_velocidad,
-            pocion.duracion,
-        )
+    reloj.programar_en(tiempo, pulso, tipo='regeneracion', dueno=enemigo,
+                        campo='evento_regeneracion', efecto=True)
