@@ -1,0 +1,439 @@
+from estructuras.vector_dinamico import Vector
+from modelo.entidades.enemigo import Enemigo
+from modelo.entidades.objetos.arma import Arma
+from modelo.entidades.objetos.armadura import Armadura
+
+COSTO_MOVER = 100
+COSTO_ATACAR = 100
+COSTO_ESPERAR = 100
+COSTO_USAR = 50
+COSTO_EQUIPAR = 50
+COSTO_ABRIR = 50
+COSTO_RECOGER = 25
+COSTO_SOLTAR = 25
+
+DIRECCIONES = ("N", "S", "E", "O")
+CRITERIOS_INVENTARIO = ("peso", "valor", "nombre")
+
+# Comando del usuario -> nombre interno. Se aceptan letras y palabras completas
+# (las palabras son las que se escriben en la bitácora, útiles para el replay).
+_ALIAS = (
+    ("N", "mover"), ("S", "mover"), ("E", "mover"), ("O", "mover"),
+    ("MOVER", "mover"),
+    ("A", "atacar"), ("ATACAR", "atacar"),
+    ("W", "esperar"), ("ESPERAR", "esperar"),
+    ("R", "recoger"), ("RECOGER", "recoger"),
+    ("T", "soltar"), ("SOLTAR", "soltar"),
+    ("EQ", "equipar"), ("EQUIPAR", "equipar"),
+    ("U", "usar"), ("USAR", "usar"),
+    ("AB", "abrir"), ("ABRIR", "abrir"),
+    ("P", "pergamino"), ("PERGAMINO", "pergamino"),
+    ("I", "inventario"), ("INVENTARIO", "inventario"),
+    ("H", "ayuda"), ("?", "ayuda"), ("AYUDA", "ayuda"),
+    ("Q", "salir"), ("SALIR", "salir"),
+)
+
+
+class Comando:
+    """Comando ya interpretado: nombre interno y argumento (dirección o índice)."""
+
+    def __init__(self, nombre, argumento=None):
+        self.nombre = nombre
+        self.argumento = argumento
+
+    def texto(self):
+        """Forma normalizada que se guarda en la bitácora."""
+        if self.argumento is None:
+            return self.nombre
+        return f"{self.nombre} {self.argumento}"
+
+
+def interpretar(texto):
+    """Traduce la entrada del usuario a un Comando. Devuelve (comando, error)."""
+    partes = texto.strip().split()
+    if not partes:
+        return None, "Escribe un comando (H para ayuda)."
+    clave = partes[0].upper()
+    nombre = None
+    for alias, interno in _ALIAS:
+        if alias == clave:
+            nombre = interno
+            break
+    if nombre is None:
+        return None, f"Comando desconocido: {partes[0]}. Escribe H para ver la ayuda."
+    resto = partes[1:]
+
+    if nombre == "mover":
+        # 'N' sola, o 'mover N'.
+        direccion = clave if clave in DIRECCIONES else (resto[0].upper() if resto else None)
+        if direccion not in DIRECCIONES:
+            return None, "Indica la dirección: N, S, E u O."
+        return Comando("mover", direccion), None
+    if nombre == "abrir":
+        if not resto or resto[0].upper() not in DIRECCIONES:
+            return None, "Indica qué puerta abrir: AB N, AB S, AB E o AB O."
+        return Comando("abrir", resto[0].upper()), None
+    if nombre in ("atacar", "recoger", "soltar", "equipar", "usar"):
+        if not resto:
+            return Comando(nombre, 1), None
+        if not resto[0].isdigit() or int(resto[0]) < 1:
+            return None, "El número debe ser un entero positivo (1, 2, ...)."
+        return Comando(nombre, int(resto[0])), None
+    if nombre == "inventario":
+        criterio = resto[0].lower() if resto else None
+        if criterio is not None and criterio not in CRITERIOS_INVENTARIO:
+            return None, "Vistas del inventario: I peso, I valor o I nombre."
+        return Comando("inventario", criterio), None
+    return Comando(nombre), None
+
+
+def _elemento(iterable, numero):
+    """Elemento 'numero' (desde 1) de una lista propia, o None."""
+    indice = 1
+    for valor in iterable:
+        if indice == numero:
+            return valor
+        indice += 1
+    return None
+
+
+def _nodo_inventario(jugador, numero):
+    indice = 1
+    for nodo in jugador.inventario.recorrer_desde_frente():
+        if indice == numero:
+            return nodo
+        indice += 1
+    return None
+
+
+class ControladorJuego:
+    def __init__(self, sesion, vista):
+        self.sesion = sesion
+        self.partida = sesion.partida
+        self.red = sesion.red
+        self.bitacora = sesion.bitacora
+        self.vista = vista
+        self.reloj = self.partida.reloj
+        self.historial = self.partida.historial
+        self.jugador = self.partida.jugador
+        self._salir = False
+        self._protegidas = Vector()     # tipo_ids marcados en_uso por el controlador
+
+        self.contador_ciclos = 0
+        self.contador_turnos_jugador = 0
+        self.contador_turnos_enemigo = 0
+        self.contador_efectos = 0
+        self.contador_rechazos = 0
+
+        # Los mensajes del modelo van a la bitácora en pantalla de la vista.
+        self.partida.al_mensaje.agregarValor(self.vista.agregar_mensaje)
+
+
+    def jugar(self):
+        """Bucle principal: ciclos de 4 pasos mientras la partida siga activa."""
+        try:
+            while not self.partida.terminada and not self._salir:
+                self.ciclo()
+        finally:
+            self._cerrar()
+        return self.partida.estado
+
+    def ciclo(self):
+        """Un ciclo del bucle principal. Devuelve la entrada procesada."""
+        self.contador_ciclos += 1
+
+        # 1. Extraer el evento mínimo del heap
+        entrada = self.reloj.extraer_siguiente()
+        if entrada is None:
+            raise RuntimeError("La agenda quedó vacía con la partida en curso.")
+        evento = entrada.dato
+        actor = None   # quién actuó, para el paso 4
+        costo = None
+
+        # 2. Turno del jugador
+        if evento.tipo == "accion" and evento.dueno is self.jugador:
+            self.contador_turnos_jugador += 1
+            costo = self._turno_jugador()
+            if costo is not None:
+                actor = self.jugador
+
+        # 3. Turno de un enemigo
+        elif evento.tipo == "accion" and isinstance(evento.dueno, Enemigo):
+            self.contador_turnos_enemigo += 1
+            self.partida.ejecutar_accion_enemigo(evento.dueno)
+            actor = evento.dueno
+
+        # Efecto del entorno: rearme, cierre, veneno... 
+        else:
+            # No es la acción de un actor: su callback ya contiene la regla y,
+            # si es recurrente, se reprograma solo.
+            self.contador_efectos += 1
+            self.reloj.ejecutar_evento(entrada)
+
+        # 4. Programar la siguiente acción
+        if actor is not None:
+            self._programar_siguiente(actor, costo)
+        return entrada
+
+    def _programar_siguiente(self, actor, costo):
+        if self.partida.terminada or not actor.vivo:
+            return
+        if actor is self.jugador:
+            self.partida.programar_siguiente_jugador(costo)
+        else:
+            self.partida.programar_siguiente_enemigo(actor)
+
+
+    def _turno_jugador(self):
+        """Paso 2. Devuelve el costo de la acción ejecutada, o None si se sale."""
+        # Llegó la siguiente decisión: se cierra el intervalo anterior.
+        if self.historial.registrando:
+            self.historial.confirmar_accion()
+        # Punto fijo de red: incorporar respuestas en orden de número.
+        self.red.incorporar_listas()
+
+        while True:
+            if self.partida.terminada:
+                return None
+            # Fichas protegidas según la sala actual y el inventario (4.4).
+            self._sincronizar_protegidas()
+            # Mostrar estado y pedir un comando.
+            self.vista.mostrar_estado(self.partida)
+            comando, error = interpretar(self.vista.leer_comando())
+            if error is not None:
+                self._rechazar(error)
+                continue
+            # Comandos sin costo de tiempo.
+            if comando.nombre == "salir":
+                self._salir = True
+                return None
+            if comando.nombre == "ayuda":
+                self.vista.mostrar_ayuda()
+                continue
+            if comando.nombre == "inventario":
+                self._mostrar_inventario(comando.argumento)
+                continue
+            if comando.nombre == "pergamino":
+                self._usar_pergamino()
+                continue
+            # Validar sin tocar el modelo: un rechazo no consume tiempo.
+            rechazo = self._validar(comando)
+            if rechazo is not None:
+                self._rechazar(rechazo)
+                continue
+            # Ejecutar dentro de un intervalo nuevo del historial.
+            costo = self._ejecutar(comando)
+            if costo is not None:
+                return costo
+
+    def _rechazar(self, mensaje):
+        self.contador_rechazos += 1
+        self.vista.agregar_mensaje(self.reloj.tiempo_actual, mensaje)
+
+    def _validar(self, comando):
+        """Devuelve un mensaje de rechazo, o None si la acción puede ejecutarse."""
+        sala = self.jugador.sala_actual
+        nombre, arg = comando.nombre, comando.argumento
+
+        if nombre == "mover":
+            salida = sala.salida_hacia(arg)
+            if salida is None:
+                return f"No hay salida hacia {arg}."
+            if salida.cerrada:
+                return f"La puerta hacia {arg} está cerrada. Ábrela con AB {arg} si tienes la llave."
+            # Sala pendiente: espera en tiempo real; el reloj virtual no avanza
+            # y no se registra nada hasta confirmar.
+            return self.red.asegurar_entrada(salida.sala_destino_id)
+
+        if nombre == "abrir":
+            salida = sala.salida_hacia(arg)
+            if salida is None:
+                return f"No hay puerta hacia {arg}."
+            if not salida.cerrada:
+                return f"La puerta hacia {arg} ya está abierta."
+            if self.partida.llave_para(salida) is None:
+                return "No tienes la llave correcta para esa puerta."
+            return None
+
+        if nombre == "atacar":
+            if len(sala.enemigos_activos) == 0:
+                return "No hay enemigos en esta sala."
+            if _elemento(sala.enemigos_activos, arg) is None:
+                return f"No existe el enemigo {arg}."
+            return None
+
+        if nombre == "recoger":
+            if len(sala.objetos_suelo) == 0:
+                return "No hay objetos en el suelo."
+            if _elemento(sala.objetos_suelo, arg) is None:
+                return f"No existe el objeto {arg} en el suelo."
+            if len(self.jugador.inventario) >= self.jugador.inventario_max:
+                return "Inventario lleno: suelta un objeto primero (T <n>)."
+            return None
+
+        if nombre in ("soltar", "equipar", "usar"):
+            nodo = _nodo_inventario(self.jugador, arg)
+            if nodo is None:
+                return f"No existe el objeto {arg} en el inventario."
+            objeto = nodo.valor
+            if nombre == "equipar" and not isinstance(objeto, (Arma, Armadura)):
+                return "Solo se pueden equipar armas o armaduras."
+            if nombre == "usar":
+                return self._validar_uso(objeto)
+            return None
+
+        return None   # esperar
+
+    def _validar_uso(self, objeto):
+        if objeto.clase == "pocion":
+            return None
+        if objeto.clase == "pergamino_retroceso":
+            return "El pergamino se usa con P."
+        if objeto.clase == "llave":
+            return "Las llaves se usan al abrir una puerta (AB <dir>)."
+        if objeto.clase in ("arma", "armadura"):
+            return "Las armas y armaduras se equipan (EQ <n>)."
+        if self.partida.aplicar_efecto is None:
+            return f"El efecto de {objeto.nombre} todavía no está disponible."
+        return None
+
+    def _ejecutar(self, comando):
+        """Aplica una acción ya validada. Devuelve su costo, o None si se anuló."""
+        self.historial.iniciar_accion(self.reloj)
+        try:
+            costo = self._aplicar(comando)
+        except Exception:
+            # Fallo inesperado: el modelo vuelve al estado previo a la acción.
+            self.historial.abortar_accion()
+            raise
+        if costo is None:
+            self.historial.abortar_accion()
+            return None
+        self.partida.contar_accion_jugador()
+        if comando.nombre != "mover":
+            # El rastro de la sala actual se refresca en cada acción.
+            self.partida.refrescar_rastro()
+        self._registrar_en_bitacora(comando.texto())
+        return costo
+
+    def _aplicar(self, comando):
+        sala = self.jugador.sala_actual
+        nombre, arg = comando.nombre, comando.argumento
+
+        if nombre == "mover":
+            destino = self.partida.cripta.sala_por_id(sala.salida_hacia(arg).sala_destino_id)
+            self.partida.entrar_a_sala(destino)
+            # Precarga desde la nueva posición (vecinas y vecinas de vecinas).
+            self.red.planificar_precarga(destino)
+            self.red.procesar_cola()
+            return COSTO_MOVER
+
+        if nombre == "atacar":
+            self.partida.atacar(_elemento(sala.enemigos_activos, arg))
+            return COSTO_ATACAR
+
+        if nombre == "esperar":
+            self.vista.agregar_mensaje(self.reloj.tiempo_actual, "Esperas.")
+            return COSTO_ESPERAR
+
+        if nombre == "recoger":
+            objeto = _elemento(sala.objetos_suelo, arg)
+            if not self.jugador.recoger(objeto):
+                return None
+            self.vista.agregar_mensaje(self.reloj.tiempo_actual, f"Recoges {objeto.nombre}.")
+            return COSTO_RECOGER
+
+        if nombre == "soltar":
+            objeto = self.jugador.soltar_nodo(_nodo_inventario(self.jugador, arg))
+            self.vista.agregar_mensaje(self.reloj.tiempo_actual, f"Sueltas {objeto.nombre}.")
+            return COSTO_SOLTAR
+
+        if nombre == "equipar":
+            nodo = _nodo_inventario(self.jugador, arg)
+            if not self.jugador.equipar_nodo(nodo):
+                return None
+            self.vista.agregar_mensaje(self.reloj.tiempo_actual, f"Equipas {nodo.valor.nombre}.")
+            return COSTO_EQUIPAR
+
+        if nombre == "usar":
+            nodo = _nodo_inventario(self.jugador, arg)
+            if not self.partida.usar_objeto(nodo):
+                self._rechazar(f"No se pudo usar {nodo.valor.nombre}.")
+                return None
+            return COSTO_USAR
+
+        if nombre == "abrir":
+            self.partida.abrir(sala.salida_hacia(arg))
+            return COSTO_ABRIR
+
+        raise ValueError(f"Acción sin implementar: {nombre}")
+
+
+    def _usar_pergamino(self):
+        """Revierte la última acción: sin tiempo, sin registro en el historial.
+
+        Se registra en la bitácora de partida porque cambia el estado (replay).
+        """
+        nodo = None
+        for actual in self.jugador.inventario.recorrer_desde_frente():
+            if actual.valor.clase == "pergamino_retroceso":
+                nodo = actual
+                break
+        if nodo is None:
+            self._rechazar("No tienes pergaminos de retroceso.")
+            return False
+        momento = self.reloj.tiempo_actual   # la bitácora guarda cuándo se usó
+        if not self.historial.usar_pergamino(self.jugador, nodo):
+            self._rechazar("No hay acciones que deshacer.")
+            return False
+        if self.bitacora is not None:
+            self.bitacora.registrar(momento, "pergamino")
+        self.vista.agregar_mensaje(
+            self.reloj.tiempo_actual,
+            "Lees el pergamino: el tiempo retrocede a antes de tu última acción.")
+        return True
+
+    def _mostrar_inventario(self, criterio):
+        if criterio is None:
+            objetos = Vector()
+            for nodo in self.jugador.inventario.recorrer_desde_frente():
+                objetos.agregarValor(nodo.valor)
+        else:
+            objetos = self.jugador.inventario_ordenado(criterio)
+        self.vista.mostrar_inventario(self.partida, objetos, criterio)
+
+
+    def _sincronizar_protegidas(self):
+        """Recalcula qué fichas protege la posición actual (robusto al retroceso)."""
+        nuevas = Vector()
+        for nodo in self.jugador.inventario.recorrer_desde_frente():
+            nuevas.agregarValor(nodo.valor.tipo_id)
+        for objeto in self.jugador.sala_actual.objetos_suelo:
+            nuevas.agregarValor(objeto.tipo_id)
+        for trampa in self.jugador.sala_actual.trampas:
+            nuevas.agregarValor(trampa.tipo_id)
+        # Primero se marcan las nuevas y luego se liberan las viejas: así una
+        # ficha que sigue en uso nunca queda momentáneamente desprotegida.
+        self.red.proteger_fichas(nuevas)
+        self.red.liberar_fichas(self._protegidas)
+        self._protegidas = nuevas
+
+    def _registrar_en_bitacora(self, texto):
+        if self.bitacora is not None:
+            self.bitacora.registrar(self.reloj.tiempo_actual, texto)
+
+    def _cerrar(self):
+        """Fin de sesión: cierra el intervalo abierto, la bitácora y la red."""
+        if self.historial.registrando:
+            self.historial.confirmar_accion()
+        if self.bitacora is not None:
+            self.bitacora.cerrar()
+        self.red.cerrar(5)
+        self.vista.mostrar_fin(self.partida)
+
+    def contadores(self):
+        return (("ciclos", self.contador_ciclos),
+                ("turnos_jugador", self.contador_turnos_jugador),
+                ("turnos_enemigo", self.contador_turnos_enemigo),
+                ("efectos", self.contador_efectos),
+                ("rechazos", self.contador_rechazos))

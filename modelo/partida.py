@@ -1,31 +1,6 @@
-"""Estado completo de una partida (plan v4, B3: partida.py).
-
-Reúne en un solo objeto lo que el resto del juego comparte: cripta, jugador, reloj,
-historial, rastro, entorno, fábrica de objetos, semilla y versiones. Además contiene
-las reglas del modelo que no son acciones del jugador:
-
-- inicializar(): rastro en t=0, primera acción del jugador en t=0 y activación de los
-  enemigos de la sala inicial (§2.4).
-- entrar_a_sala(): lo que ocurre al completar un movimiento (rastro, trampas,
-  activación de dormidos en orden ascendente de instancia_id).
-- turno de cada enemigo: decidir_accion + ejecutar + reprogramar con costo 100.
-- daño y muerte de enemigos (botín de 'suelta', contador de derrotados).
-- victoria / derrota.
-
-MVC: este módulo NO conoce HTTP, disco ni la vista. Lo que necesita de afuera llega
-por parámetros:
-- resolver_ficha(tipo_id) -> dict | None: para crear el botín de 'suelta'. El
-  controlador lo implementa con ControladorRed (memoria -> disco -> red).
-- al_morir_enemigo / al_entrar_sala / al_mensaje: Vectores de funciones que la
-  partida invoca. El controlador conecta ahí notificar_muerte_enemigo, el en_uso de
-  fichas de la sala actual y la bitácora de pantalla.
-
-La construcción con red (esqueleto, primer lote, catálogo, semilla, bitácora) está
-en controlador/inicio_partida.py.
-"""
 from estructuras.vector_dinamico import Vector
 from estructuras.ordenamientos import ordenar
-from modelo.deltas import DeltaAtributos, DeltaListaSimple
+from modelo.deltas import DeltaAtributos, DeltaListaSimple, DeltaObjeto
 from modelo.entorno import Entorno
 from modelo.historial import Historial
 from modelo.rastro import Rastro
@@ -40,12 +15,7 @@ CREADA = "creada"
 
 
 def _clave_natural(texto):
-    """'e-9' < 'e-10': compara los tramos numéricos como números.
-
-    Los ids de instancia del API son texto ('e-201'). Con comparación de texto pura
-    'e-1000' quedaría antes que 'e-201'. Se usa orden natural, que coincide con el
-    texto cuando los números tienen la misma cantidad de dígitos.
-    """
+    """'e-9' < 'e-10': compara los tramos numéricos como números."""
     texto = str(texto)
     partes = []
     actual = ""
@@ -107,9 +77,11 @@ class Partida:
         self.al_entrar_sala = Vector()     # f(sala_anterior, sala_nueva)
         self.al_mensaje = Vector()         # f(tiempo, texto)
 
+        # Efectos temporales del rol 2: f(partida, objeto) -> bool. Ver usar_objeto.
+        self.aplicar_efecto = None
+
         self.reloj.vincular_actor(jugador)
 
-    # ------------------------------------------------------------------ consulta
 
     @property
     def tiempo(self):
@@ -139,7 +111,6 @@ class Partida:
                 ("tiempo_final", self.reloj.tiempo_actual),
                 ("resultado", self.estado))
 
-    # ------------------------------------------------------------------ inicio
 
     def inicializar(self):
         """t=0: rastro, primera acción del jugador y enemigos de la sala inicial.
@@ -174,7 +145,6 @@ class Partida:
         """Apéndice B: el rastro de la sala actual se refresca en cada acción."""
         self.rastro.registrar(self.jugador.sala_actual.id, self.reloj.tiempo_actual)
 
-    # ------------------------------------------------------------------ salas
 
     def activar_enemigos(self, sala):
         """Pasa los dormidos a activos en orden ascendente de instancia_id (§2.4).
@@ -204,27 +174,22 @@ class Partida:
         return activados
 
     def entrar_a_sala(self, sala):
-        """Efectos de completar un movimiento del jugador hacia 'sala'.
-
-        Precondiciones (las valida el controlador ANTES de abrir el intervalo):
-        salida existente y abierta, y contenido de la sala ya incorporado.
-        Debe llamarse dentro del intervalo del historial (después de tomar_turno),
-        para que el pergamino pueda revertir el movimiento.
-        """
+        """Efectos de completar un movimiento del jugador hacia 'sala'."""
         anterior = self.jugador.sala_actual
         self.historial.registrar(DeltaAtributos(self.jugador, "sala_actual"))
         self.jugador.sala_actual = sala
         self.refrescar_rastro()
         self._emitir(f"Entras a {sala.nombre}.")
-        # §2.10: la trampa se activa justo después del movimiento.
-        self.entorno.al_entrar(self.jugador, sala)
+        # la trampa se activa justo después del movimiento.
+        vida_antes = self.jugador.vida
+        if self.entorno.al_entrar(self.jugador, sala):
+            self._emitir(f"¡Una trampa se activa! -{vida_antes - self.jugador.vida} de vida.")
         if self.jugador.vivo:
             self.activar_enemigos(sala)
         self._notificar_entrada(anterior, sala)
         self.verificar_fin()
         return sala
 
-    # ------------------------------------------------------------------ enemigos
 
     def ejecutor_enemigo(self, enemigo):
         """Callback del heap para la acción de 'enemigo'.
@@ -237,7 +202,13 @@ class Partida:
         return ejecutar
 
     def turno_enemigo(self, enemigo):
-        """Decide y ejecuta una acción del enemigo; luego la reprograma (costo 100)."""
+        """Callback del heap"""
+        accion = self.ejecutar_accion_enemigo(enemigo)
+        self.programar_siguiente_enemigo(enemigo)
+        return accion
+
+    def ejecutar_accion_enemigo(self, enemigo):
+        """Paso 3 del bucle"""
         if not enemigo.vivo or self.terminada:
             return None
         accion, objetivo = enemigo.decidir_accion(
@@ -248,12 +219,15 @@ class Partida:
             self._emitir(f"{self.nombre_enemigo(enemigo)} te ataca: -{perdida} de vida.")
         elif accion == "mover":
             self._mover_enemigo(enemigo, objetivo)
-        if enemigo.vivo and not self.terminada:
-            self.verificar_fin()
-            if not self.terminada:
-                self.reloj.programar(enemigo, COSTO_ACCION_ENEMIGO,
-                                     self.ejecutor_enemigo(enemigo))
+        self.verificar_fin()
         return accion
+
+    def programar_siguiente_enemigo(self, enemigo):
+        """Paso para un enemigo: próxima acción a ahora + intervalo(100, vel)"""
+        if not enemigo.vivo or self.terminada:
+            return None
+        return self.reloj.programar(enemigo, COSTO_ACCION_ENEMIGO,
+                                    self.ejecutor_enemigo(enemigo))
 
     def _mover_enemigo(self, enemigo, destino):
         origen = enemigo.sala_actual
@@ -276,10 +250,7 @@ class Partida:
         return perdida
 
     def registrar_muerte_enemigo(self, enemigo):
-        """Quita al enemigo de la sala, deja su botín y avisa a los observadores.
-
-        Actor.morir ya canceló su acción y sus efectos (sin recorrer la agenda).
-        """
+        """Quita al enemigo de la sala, deja su botín y avisa a los observadores"""
         sala = enemigo.sala_actual
         if sala is not None and sala.enemigos_activos.contiene_valor(enemigo):
             self.historial.registrar(DeltaListaSimple(sala.enemigos_activos, enemigo))
@@ -313,7 +284,59 @@ class Partida:
         """Identificador visible y único (§2.6): 'Rata gigante #e-201'."""
         return f"{enemigo.nombre} #{enemigo.instancia_id}"
 
-    # ------------------------------------------------------------------ fin
+
+    def atacar(self, enemigo):
+        """Ataque del jugador a un enemigo de su sala. Devuelve la vida quitada."""
+        if enemigo.sala_actual is not self.jugador.sala_actual or not enemigo.vivo:
+            raise ValueError("El enemigo no está en la sala del jugador.")
+        dano = self.reloj.calcular_dano(self.jugador.ataque, enemigo.defensa)
+        perdida = enemigo.recibir_dano(dano)
+        self._emitir(f"Atacas a {self.nombre_enemigo(enemigo)}: -{perdida} de vida.")
+        if not enemigo.vivo:
+            self.registrar_muerte_enemigo(enemigo)
+        return perdida
+
+    def llave_para(self, salida):
+        """Llave del inventario que abre la salida (por tipo_id), o None."""
+        if salida.llave is None:
+            return None
+        for nodo in self.jugador.inventario.recorrer_desde_frente():
+            objeto = nodo.valor
+            if objeto.clase == "llave" and objeto.tipo_id == salida.llave:
+                return objeto
+        return None
+
+    def abrir(self, salida):
+        """Abre con la llave ya validada; la llave no se consume."""
+        abierta = self.entorno.abrir(salida)
+        if abierta:
+            self._emitir(f"Abres la puerta {salida.direccion}.")
+        return abierta
+
+    def consumir(self, nodo):
+        """Quita del inventario un objeto gastado (reversible con el pergamino)."""
+        jugador = self.jugador
+        self.historial.registrar(DeltaObjeto(jugador, nodo.valor, nodo))
+        if jugador.cursor is nodo:
+            jugador.cursor = nodo.siguiente or nodo.anterior
+        jugador.inventario.eliminar_nodo(nodo)
+
+    def usar_objeto(self, nodo):
+        """Usa un objeto del inventario. Devuelve True si tuvo efecto."""
+        objeto = nodo.valor
+        if objeto.clase == "pocion":
+            if objeto.cura > 0:
+                curado = self.jugador.curar(objeto.cura)
+                self._emitir(f"Usas {objeto.nombre}: +{curado} de vida.")
+            if objeto.modificador_velocidad and self.aplicar_efecto is not None:
+                self.aplicar_efecto(self, objeto)
+            self.consumir(nodo)
+            return True
+        if self.aplicar_efecto is not None and objeto.clase in ("antidoto", "antorcha"):
+            if self.aplicar_efecto(self, objeto):
+                return True
+        return False
+
 
     def verificar_fin(self):
         """Derrota si la vida llegó a 0; victoria al estar en la sala de salida."""
@@ -331,7 +354,6 @@ class Partida:
         self.historial.registrar(DeltaAtributos(self, "estado"))
         self.estado = nuevo
 
-    # ------------------------------------------------------------------ avisos
 
     def _emitir(self, texto):
         for funcion in self.al_mensaje:

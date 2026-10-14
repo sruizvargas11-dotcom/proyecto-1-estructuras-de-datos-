@@ -251,11 +251,24 @@ class ControladorRed:
         return self._fichas.buscar(tipo_id)
     
     def notificar_muerte_enemigo(self, enemigo):
-        """ROL 4 DEBE llamar esto justo cuando enemigo.vivo pase a False
-        (por ejemplo, justo después de Actor.recibir_dano/morir), para que
-        su ficha deje de estar protegida y vuelva a ser candidata a desalojo.
-        Sin esta llamada, la ficha queda protegida para siempre."""
         self._fichas.desmarcar_en_uso(enemigo.tipo_id)
+
+    def proteger_fichas(self, tipo_ids):
+        """Marca en_uso las fichas de objetos/trampas de la sala actual e inventario."""
+        self.resolver_catalogo(tipo_ids)
+        for tipo_id in tipo_ids:
+            try:
+                self._fichas.marcar_en_uso(tipo_id)
+            except KeyError:
+                pass
+
+    def liberar_fichas(self, tipo_ids):
+        """Inverso de proteger_fichas; tolera fichas ya liberadas o desalojadas."""
+        for tipo_id in tipo_ids:
+            try:
+                self._fichas.desmarcar_en_uso(tipo_id)
+            except (KeyError, ValueError):
+                pass
 
     def version_catalogo(self):
         """Versión vigente del catálogo como texto (bitácora y guardado)."""

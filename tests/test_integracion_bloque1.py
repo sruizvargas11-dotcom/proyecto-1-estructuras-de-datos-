@@ -152,7 +152,7 @@ def test_disco_sin_permiso_no_se_oculta(tmp_path):
 
 
 def test_main_dos_arranques(tmp_path,capsys):
-    args=['--offline','--cripta','cripta-01','--cache-dir',str(tmp_path)]
+    args=['--offline','--solo-mapa','--cripta','cripta-01','--cache-dir',str(tmp_path)]
     assert main(args)==0
     assert 'fuente de datos' in capsys.readouterr().out
     assert main(args)==0
