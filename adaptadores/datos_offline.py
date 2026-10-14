@@ -28,8 +28,30 @@ class DatosOffline(FuenteDeDatos):
 
 
 
+    def descargada(self, cripta_id):
+        """True si la cripta tiene su carpeta con los datos generales."""
+        return (isinstance(cripta_id, str) and bool(cripta_id)
+                and os.path.isfile(os.path.join(self._carpeta, cripta_id, "general.json")))
+
     def listar_criptas(self):
-        return self._leer("criptas.json")
+        """Solo las criptas que se pueden jugar sin conexión.
+
+        criptas.json lo escribe descargar_offline con la lista completa del API,
+        aunque solo se haya bajado una cripta; las que no tienen carpeta se omiten
+        para no ofrecer en el menú una cripta que fallaría al cargarse.
+        """
+        respuesta = self._leer("criptas.json")
+        if not isinstance(respuesta, dict) or not isinstance(respuesta.get("criptas"), list):
+            return respuesta          # formato inválido: que lo reporte quien lo valida
+        disponibles = [c for c in respuesta["criptas"]
+                       if isinstance(c, dict) and self.descargada(c.get("id"))]
+        if respuesta["criptas"] and not disponibles:
+            raise FileNotFoundError(
+                f"Ninguna cripta de criptas.json está descargada en '{self._carpeta}'. "
+                "Descarga una con: python -m herramientas.descargar_offline <cripta_id>")
+        filtrada = dict(respuesta)
+        filtrada["criptas"] = disponibles
+        return filtrada
 
     # QUE CAMBIÓ:
     # los metodos retornan exactamente lo mismo que su estado previo

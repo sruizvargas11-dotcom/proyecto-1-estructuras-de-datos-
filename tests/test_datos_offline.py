@@ -9,12 +9,6 @@ from adaptadores.fuente_datos import FuenteDeDatos
 CRIPTA = "cripta-01"
 MAX_POR_LOTE = 10
 
-# QUE CAMBIO:
-# se dividieron los metodos de prueba en clases
-# estas clases representan un tipo de test
-
-# porfa eliminar los comentarios encima de cada metodo para confirmar lectura!! 
-
 class TestContrato(unittest.TestCase):
     # DatosOffline cumple la interfaz y devuelve los datos reales de la cripta.
 
@@ -229,15 +223,46 @@ class TestCarpeta(unittest.TestCase):
         self.assertIn("cripta-inexistente", mensaje)
         self.assertIn("general.json", mensaje)
 
-    # NUEVO: el constructor lee de la carpeta que se le pase (usa una carpeta temporal).
+    # el constructor lee de la carpeta que se le pase (usa una carpeta temporal).
     def test_carpeta_personalizada(self):
         with tempfile.TemporaryDirectory() as carpeta:
             with open(os.path.join(carpeta, "criptas.json"), "w", encoding="utf-8") as f:
                 json.dump({"criptas": [{"id": "cripta-prueba"}]}, f)
+            # listar_criptas solo ofrece criptas descargadas (con su general.json).
+            os.makedirs(os.path.join(carpeta, "cripta-prueba"))
+            with open(os.path.join(carpeta, "cripta-prueba", "general.json"), "w",
+                      encoding="utf-8") as f:
+                json.dump({"id": "cripta-prueba"}, f)
             offline = DatosOffline(carpeta)
             self.assertEqual(offline.listar_criptas()["criptas"][0]["id"], "cripta-prueba")
 
-    # NUEVO: funciona aunque Python se ejecute desde otra carpeta (ruta desde __file__).
+    # el menú offline no ofrece criptas listadas pero no descargadas.
+    def test_listar_criptas_omite_las_no_descargadas(self):
+        with tempfile.TemporaryDirectory() as carpeta:
+            with open(os.path.join(carpeta, "criptas.json"), "w", encoding="utf-8") as f:
+                json.dump({"criptas": [{"id": "c-bajada", "nombre": "A"},
+                                       {"id": "c-falta", "nombre": "B"}]}, f)
+            os.makedirs(os.path.join(carpeta, "c-bajada"))
+            with open(os.path.join(carpeta, "c-bajada", "general.json"), "w",
+                      encoding="utf-8") as f:
+                json.dump({"id": "c-bajada"}, f)
+            offline = DatosOffline(carpeta)
+            ids = [c["id"] for c in offline.listar_criptas()["criptas"]]
+            self.assertEqual(ids, ["c-bajada"])
+            # El archivo original no se modifica.
+            with open(os.path.join(carpeta, "criptas.json"), encoding="utf-8") as f:
+                self.assertEqual(len(json.load(f)["criptas"]), 2)
+
+    # si ninguna está descargada, el error dice cómo descargar una.
+    def test_listar_criptas_sin_ninguna_descargada_explica_que_hacer(self):
+        with tempfile.TemporaryDirectory() as carpeta:
+            with open(os.path.join(carpeta, "criptas.json"), "w", encoding="utf-8") as f:
+                json.dump({"criptas": [{"id": "c-falta", "nombre": "B"}]}, f)
+            with self.assertRaises(FileNotFoundError) as ctx:
+                DatosOffline(carpeta).listar_criptas()
+            self.assertIn("descargar_offline", str(ctx.exception))
+
+    # funciona aunque Python se ejecute desde otra carpeta (ruta desde __file__).
     def test_no_depende_del_directorio_actual(self):
         directorio_original = os.getcwd()
         with tempfile.TemporaryDirectory() as otro_directorio:
