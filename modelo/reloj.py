@@ -250,6 +250,38 @@ class Reloj:
             raise RuntimeError('Todavía no corresponde la decisión del actor.')
         self._retirar(entrada)
 
+    def extraer_siguiente(self):
+        """Paso 1 del bucle principal: retira el evento válido mínimo.
+
+        Orden (tiempo, seq); los cancelados se descartan antes (lazy). Avanza el
+        reloj al instante del evento, desvincula el handle de su dueño y registra
+        el delta si hay un intervalo abierto. NO ejecuta el callback: el bucle
+        decide qué hacer según el dueño (jugador, enemigo o efecto).
+        Devuelve la entrada retirada, o None si la agenda está vacía.
+        """
+        if self._ejecutando:
+            raise RuntimeError('No se puede extraer dentro de otro evento.')
+        entrada = self.proximo()
+        if entrada is None:
+            return None
+        self._retirar(entrada)
+        return entrada
+
+    def ejecutar_evento(self, entrada):
+        """Ejecuta el callback de una entrada ya retirada con extraer_siguiente.
+
+        Se usa para efectos del entorno (rearme, cierre, veneno...). Un efecto
+        recurrente se reprograma dentro de su propio callback.
+        """
+        if entrada._en_heap:
+            raise RuntimeError('Primero se retira el evento con extraer_siguiente.')
+        self._ejecutando = True
+        try:
+            entrada.dato.ejecutar(self)
+            self.contador_ejecutados += 1
+        finally:
+            self._ejecutando = False
+
     def contadores(self):
         return (('eventos_ejecutados', self.contador_ejecutados),
                 ('calculos_dano', self.contador_calculos_dano))
