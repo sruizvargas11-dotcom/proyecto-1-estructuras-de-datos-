@@ -5,6 +5,7 @@ from modelo.entorno import Entorno
 from modelo.historial import Historial
 from modelo.rastro import Rastro
 from modelo.reloj import Reloj
+from modelo.efectos import iniciar_regeneracion
 
 COSTO_ACCION_ENEMIGO = 100
 
@@ -170,6 +171,7 @@ class Partida:
             enemigo.sala_actual = sala
             self.reloj.programar(enemigo, COSTO_ACCION_ENEMIGO,
                                  self.ejecutor_enemigo(enemigo))
+            iniciar_regeneracion(self.reloj, enemigo)
             activados += 1
         return activados
 

@@ -71,6 +71,12 @@ class Actor:
         self._reloj = None
         self.eventos_efectos = ListaDoble()
 
+        # Slots de efectos temporales (rol 2, Sec. 2.10): handles propios para
+        # que programar_en los gestione con su mecanismo de campo habitual.
+        self.evento_veneno = None
+        self.estado_veneno = None
+        self.evento_mod_velocidad = None
+
     def _registrar_delta(self, delta):
         if self._reloj is not None:
             self._reloj.registrar(delta)

@@ -1,0 +1,117 @@
+# 4.12 - EFECTOS TEMPORALES (VENENO, VELOCIDAD, ANTORCHA, REGENERACIÓN)
+
+**Redacta ROL 2, revisa ROL 3**  
+**Borrador técnico B3 — 14/10/2026**
+
+## 1. PROBLEMA
+
+El enunciado, específicamente en la sección 2.10 y el Apéndice B, establece cuatro efectos que deben funcionar utilizando el tiempo del reloj virtual y no los turnos del juego.
+
+Estos efectos son:
+
+- **Veneno:** debe causar daño cada 80 unidades de tiempo, hasta completar 400 unidades desde que se aplica. Además, puede cancelarse utilizando un antídoto.
+- **Modificador temporal de velocidad:** debe modificar la velocidad del actor y reajustar su próxima acción tanto cuando se aplica como cuando termina el efecto, tal como se indica en la sección 2.3.
+- **Antorcha:** debe permanecer activa durante su duración y apagarse automáticamente cuando esta termine.
+- **Regeneración:** debe recuperar vida periódicamente en los enemigos, sin superar nunca su `vida_max`.
+
+El trabajo realizado anteriormente en `ROL3_BLOQUE3.md` ya dejó preparado el mecanismo necesario para programar, cancelar y reprogramar eventos según la velocidad, además de los deltas correspondientes. Sin embargo, ese documento dejaba algunas decisiones pendientes, específicamente sobre la reaplicación de efectos, el origen y daño del veneno y qué debía ocurrir con el pulso de veneno exactamente en `t+400`.
+
+En este bloque se definen esas reglas para evitar que cada implementación las interprete de una manera diferente.
+
+## 2. ALTERNATIVAS CONSIDERADAS
+
+Inicialmente se consideró guardar el estado de cada efecto en un `dict` asociado al actor, por ejemplo, para almacenar el daño pendiente o la cantidad de pulsos restantes. Esta opción se descarta porque el enunciado prohíbe utilizar diccionarios como índices o cachés, incluso para información interna de los efectos.
+
+También se consideró agregar al actor un campo nuevo que almacenara el estado del efecto como JSON. Esto tampoco es necesario, ya que el objeto `EstadoVeneno` permite representar ese estado directamente y puede serializarse como cualquier otro atributo cuando ROL 1 guarde la partida.
+
+Para la reaplicación del veneno se analizaron dos posibilidades: acumular el nuevo daño con el efecto anterior o reiniciar completamente el efecto. Se decidió **reiniciar el efecto**. Acumular diferentes aplicaciones, por ejemplo, una proveniente de una trampa y otra de un ataque, haría difícil determinar cuántos pulsos deberían quedar y cómo debería combinarse el daño. Como el enunciado no establece una fórmula para acumular efectos, no se agrega una regla que no esté definida.
+
+También se tuvo que decidir qué ocurre con el pulso exactamente en `t+400`. Se decidió que **sí debe ejecutarse**. De esta manera, los pulsos ocurren en `80, 160, 240, 320 y 400`, dando exactamente cinco pulsos. Si se considerara `t+400` como un límite exclusivo, solo habría cuatro pulsos durante las 400 unidades de duración, lo que no coincide con la descripción de que el daño ocurre cada 80 unidades durante 400 unidades.
+
+## 3. DECISIÓN Y IMPLEMENTACIÓN
+
+En `modelo/efectos.py` se implementaron cuatro efectos reutilizables:
+
+- `aplicar_veneno` / `cancelar_veneno`
+- `aplicar_modificador_velocidad`
+- `encender_antorcha`
+- `iniciar_regeneracion`
+
+Todos utilizan `Reloj.programar_en` para trabajar directamente con el tiempo virtual. Cada efecto mantiene su propio evento:
+
+- `evento_veneno`
+- `evento_mod_velocidad`
+- `evento_apagado`
+- `evento_regeneracion`
+
+También se reutilizan los deltas que ya existen en el proyecto, como `DeltaAtributos` y `DeltaEfecto`, que permiten aplicar, cancelar y programar los cambios sin modificar directamente el estado de manera que se pierda el historial.
+
+La lógica de los efectos no decide quién está aplicando el veneno ni cuánto daño debe causar. Esa información debe venir de la ficha concreta que corresponda. De esta manera, `aplicar_veneno` queda como una herramienta reutilizable y no asume que el efecto proviene de una trampa, un ataque u otra fuente.
+
+Además, se agregó `aplicar_efecto_objeto(partida, objeto)`, que implementa realmente el hook `Partida.aplicar_efecto` que ROL 4 había dejado pendiente en `controlador/inicio_partida.py`.
+
+Con esto:
+
+- Las pociones que tengan `modificador_velocidad` utilizan `aplicar_modificador_velocidad`.
+- Los antídotos utilizan `cancelar_veneno`.
+- Las antorchas utilizan `encender_antorcha`.
+
+También se modificó `Partida.activar_enemigos` para iniciar la regeneración de cada enemigo que corresponda, después de programar su primera acción.
+
+Las reglas finales quedan establecidas de la siguiente manera:
+
+- Si se aplica veneno nuevamente, se reinicia completamente su conteo de pulsos con el nuevo daño.
+- El pulso de `t+400` sí ocurre y corresponde al quinto y último pulso.
+- No se permite aplicar un segundo modificador de velocidad mientras ya exista uno activo. Primero debe terminar el anterior, siguiendo la misma protección que `programar_en` ya utiliza para los eventos con un único handle.
+- La regeneración no tiene una duración propia. Continúa mientras el enemigo permanezca vivo.
+- Cuando el enemigo muere, la regeneración se cancela automáticamente porque su evento se encuentra registrado en `enemigo.eventos_efectos` con `efecto=True`, y `Actor.morir` ya se encarga de recorrer y cancelar esos eventos.
+
+## 4. COMPLEJIDAD ALGORÍTMICA
+
+Cada pulso de veneno o regeneración se programa mediante `programar_en`, por lo que tiene un costo de **O(log n) amortizado**, igual que los demás eventos administrados por el reloj.
+
+La cancelación de un efecto es **O(1)** porque se utiliza directamente el handle del evento. No es necesario recorrer toda la agenda para encontrarlo.
+
+El estado de un efecto como `EstadoVeneno` se mantiene en un objeto de tamaño constante. No se utiliza una lista ni un diccionario para almacenar los pulsos. Cuando el veneno se reaplica o avanza al siguiente pulso, se reemplaza la referencia correspondiente en O(1), dejando que el delta asociado registre correctamente el cambio.
+
+## 5. PRUEBAS Y EVIDENCIA
+
+Se agregaron pruebas específicas en `tests/test_efectos_bloque3.py`, con un total de **23 casos**.
+
+Estas pruebas verifican, entre otras cosas:
+
+- Que el veneno aplique pulsos cada 80 unidades hasta `t+400`, incluyendo el último pulso.
+- Que utilizar un antídoto antes del siguiente pulso evite ese daño.
+- Que reaplicar veneno reinicie correctamente el conteo.
+- Que un veneno letal no deje un pulso pendiente después de que el actor muere.
+- Que los efectos se integren correctamente con `Entorno.activar_trampa` mediante `aplicar_efecto`.
+- Que el modificador de velocidad cambie y reajuste correctamente la acción pendiente.
+- Que, por ejemplo, una acción con costo 100 y una velocidad que cambia de 100 a 50 sea reprogramada para `t=200`.
+- Que no sea posible aplicar un segundo modificador de velocidad mientras otro está activo.
+- Que la antorcha se apague automáticamente al terminar su duración.
+- Que encender una antorcha que ya está activa no reinicie su duración.
+- Que la regeneración nunca supere `vida_max`.
+- Que la regeneración se cancele automáticamente cuando el enemigo muere.
+
+Las pruebas relacionadas con la reversión utilizan el `Historial` real del proyecto mediante `iniciar_accion`, `confirmar_accion` y `revertir_accion`, en lugar de utilizar un mecanismo de prueba separado.
+
+También se agregaron cuatro pruebas de integración en `tests/test_integracion_efectos_partida.py`. Estas ejecutan el flujo completo utilizando una `nueva_partida` real y comprueban que:
+
+- `partida.aplicar_efecto` esté conectado correctamente con `aplicar_efecto_objeto`.
+- Una antorcha real del catálogo offline pueda encenderse.
+- Un veneno pueda cancelarse utilizando un antídoto real del catálogo (`itm_antidoto`).
+- Una poción de velocidad pueda aplicarse y posteriormente restaurarse utilizando una ficha de prueba.
+
+Actualmente, el catálogo offline no contiene una poción con `modificador_velocidad`, por lo que esta última prueba utiliza una ficha creada específicamente para probar el comportamiento.
+
+Después de integrar estos cambios con la base de ROL 4 (`controlador_juego`, `Partida` y PR #15), la suite completa del repositorio queda con **549 pruebas aprobadas**.
+
+## 6. LIMITACIONES Y PUNTOS PENDIENTES
+
+El catálogo offline disponible actualmente no contiene enemigos con `regeneracion > 0` ni pociones con `modificador_velocidad`. Por esta razón, la integración de esos casos con `Partida` se probó utilizando fichas de prueba construidas manualmente y no mediante datos reales de una cripta.
+
+Por ahora tampoco existe `cancelar_modificador_velocidad`. El enunciado únicamente establece que el efecto debe terminar automáticamente, por lo que no se implementó una cancelación anticipada. Si posteriormente el equipo necesita esta funcionalidad, puede agregarse siguiendo el mismo patrón utilizado por `cancelar_veneno`.
+
+También queda pendiente definir cómo una trampa o un enemigo podría aplicar directamente el veneno. La función `aplicar_veneno` ya está preparada para recibir esa información cuando exista en una ficha concreta, por ejemplo, una trampa como `trp_dardos` que tenga definido un daño por veneno. Sin embargo, ese campo todavía no existe en el catálogo actual, por lo que no se inventó una regla adicional.
+
+Finalmente, hay un detalle relacionado con `usar_objeto`, implementado en ROL 4. Actualmente, cuando `aplicar_efecto` devuelve `True` para efectos como antídotos o antorchas, el método no llama a `self.consumir(nodo)`. Este punto ya fue comunicado al equipo en el canal del proyecto. No se modificó desde este bloque porque la decisión sobre cuándo debe consumirse el objeto corresponde a la lógica que conecta el uso de objetos con la interfaz, y no directamente a la implementación de estos efectos.
