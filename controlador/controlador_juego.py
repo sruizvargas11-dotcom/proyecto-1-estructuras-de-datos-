@@ -1,3 +1,4 @@
+from controlador.narrador_eventos import describir_evento
 from estructuras.vector_dinamico import Vector
 from modelo.entidades.enemigo import Enemigo
 from modelo.entidades.objetos.arma import Arma
@@ -163,12 +164,18 @@ class ControladorJuego:
             self.partida.ejecutar_accion_enemigo(evento.dueno)
             actor = evento.dueno
 
-        # Efecto del entorno: rearme, cierre, veneno... 
+        # Efecto del entorno: rearme, cierre, veneno...
         else:
             # No es la acción de un actor: su callback ya contiene la regla y,
             # si es recurrente, se reprograma solo.
             self.contador_efectos += 1
+            vida_antes = getattr(evento.dueno, "vida", None)
             self.reloj.ejecutar_evento(entrada)
+            texto = describir_evento(self.partida, evento, vida_antes)
+            if texto is not None:
+                self.vista.agregar_mensaje(self.reloj.tiempo_actual, texto)
+            # Un pulso de veneno puede matar al jugador sin que actúe nadie más.
+            self.partida.verificar_fin()
 
         # 4. Programar la siguiente acción
         if actor is not None:

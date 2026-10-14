@@ -37,13 +37,15 @@ def main(argumentos=None):
                 raise ValueError('El listado de criptas es inválido.')
             if not respuesta['criptas']:
                 raise ValueError('No hay criptas disponibles.')
-            print('Criptas disponibles:')
             for cripta in respuesta['criptas']:
                 if (not isinstance(cripta, dict) or not isinstance(cripta.get('id'), str)
                         or not isinstance(cripta.get('nombre'), str)):
                     raise ValueError('El listado contiene una cripta inválida.')
-                print(f"- {cripta['id']}: {cripta['nombre']}")
-            cripta_id = respuesta['criptas'][0]['id']
+            if opciones.solo_mapa:
+                cripta_id = respuesta['criptas'][0]['id']
+            else:
+                from vista.vista_consola import VistaConsola
+                cripta_id = VistaConsola().elegir_cripta(respuesta['criptas'])
         if opciones.solo_mapa:
             cripta, desde_cache = cargar_cripta(fuente, cripta_id, opciones.cache_dir)
             print(f'Cripta cargada: {cripta.id} | {len(cripta)} salas')
@@ -70,8 +72,9 @@ def jugar(fuente, cripta_id, opciones):
         ruta_bitacora=ruta_bitacora_por_defecto(cripta_id, semilla),
         cache_size=opciones.cache_size,
         despachador=DespachoEnHilos() if opciones.hilos else None)
-    print(f'Partida en {cripta_id} | semilla {semilla} | H para ver los comandos')
-    ControladorJuego(sesion, VistaConsola()).jugar()
+    vista = VistaConsola()
+    vista.mostrar_inicio(cripta_id, semilla)
+    ControladorJuego(sesion, vista).jugar()
     return 0
 
 

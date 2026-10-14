@@ -35,6 +35,13 @@ Cada partida nueva genera su semilla y escribe su bitácora en
 | `I [peso\|valor\|nombre]` | ver inventario (orden real u ordenado) | sin tiempo |
 | `H` / `Q` | ayuda / salir | sin tiempo |
 
+Sin `--cripta`, el juego lista las criptas disponibles y pide elegir una (Enter = la primera).
+
 El controlador y el bucle de 4 pasos están en `controlador/controlador_juego.py`;
-la vista mínima de consola en `vista/vista_consola.py`. Guardar y cargar (`G`/`L`)
-se agregan en el bloque 4 junto con el guardado binario.
+la vista de consola en `vista/vista_consola.py`. La pantalla muestra sala, salidas
+(con llave y cierre automático), enemigos con su `instancia_id`, suelo, trampas,
+vida y estadísticas, efectos activos (veneno, velocidad, antorcha), inventario y
+los últimos 20 mensajes. Los efectos del entorno (pulsos de veneno, rearme de
+trampas, cierre de puertas, antorcha que se apaga) se narran con
+`controlador/narrador_eventos.py`. Guardar y cargar (`G`/`L`) se agregan en el
+bloque 4 junto con el guardado binario.
