@@ -45,20 +45,37 @@ class BitacoraPartida:
             if primera != MARCA:
                 raise ValueError(f"El archivo no es una bitácora de CRIPTA.")
 
-            campos = {}
+            cripta_id = version_cripta = version_catalogo = semilla = None
             for linea in f:
                 if linea.strip() == SEPARADOR:
                     break
                 if ":" in linea:
                     clave, _, valor = linea.partition(":")
-                    campos[clave.strip()] = valor.strip()
+                    clave, valor = clave.strip(), valor.strip()
+                    if clave == "cripta_id":
+                        cripta_id = valor
+                    elif clave == "version_cripta":
+                        version_cripta = valor
+                    elif clave == "version_catalogo":
+                        version_catalogo = valor
+                    elif clave == "semilla":
+                        semilla = valor
+
+        for nombre_campo, valor_campo in (
+            ("cripta_id", cripta_id),
+            ("version_cripta", version_cripta),
+            ("version_catalogo", version_catalogo),
+            ("semilla", semilla),
+        ):
+            if valor_campo is None:
+                raise KeyError(nombre_campo)
 
         return cls(
             ruta             = ruta,
-            cripta_id        = campos["cripta_id"],
-            version_cripta   = campos["version_cripta"],
-            version_catalogo = campos["version_catalogo"],
-            semilla          = int(campos["semilla"]),
+            cripta_id        = cripta_id,
+            version_cripta   = version_cripta,
+            version_catalogo = version_catalogo,
+            semilla          = int(semilla),
         )
 
     def registrar(self, tiempo: int, accion: str):
