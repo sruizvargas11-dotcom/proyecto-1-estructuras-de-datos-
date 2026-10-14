@@ -172,3 +172,23 @@ def _programar_pulso_regeneracion(reloj, enemigo):
 
     reloj.programar_en(tiempo, pulso, tipo='regeneracion', dueno=enemigo,
                         campo='evento_regeneracion', efecto=True)
+
+
+# --------------------------------------------------------------------------- 
+# Conector con Partida.aplicar_efecto (f(partida, objeto) -> bool)
+# ---------------------------------------------------------------------------
+
+def aplicar_efecto_objeto(partida, objeto):
+    """Implementación real del hook que Partida.usar_objeto ya deja listo
+    para rol 2. Partida decide CUÁNDO llamarlo (poción con modificador de
+    velocidad, antídoto, antorcha); acá se decide QUÉ hace cada clase.
+    """
+    reloj, jugador = partida.reloj, partida.jugador
+    if objeto.clase == 'pocion':
+        return aplicar_modificador_velocidad(
+            reloj, jugador, objeto.modificador_velocidad, objeto.duracion)
+    if objeto.clase == 'antidoto':
+        return cancelar_veneno(reloj, jugador)
+    if objeto.clase == 'antorcha':
+        return encender_antorcha(reloj, objeto)
+    return False

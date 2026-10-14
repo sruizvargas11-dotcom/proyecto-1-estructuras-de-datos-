@@ -5,6 +5,7 @@ from controlador.controlador_red import ControladorRed, cargar_cripta, _generale
 from controlador.semilla import generar_semilla, validar_semilla
 from modelo.entidades.jugador import Jugador
 from modelo.entidades.objetos.fabrica_objetos import FabricaObjetos
+from modelo import efectos
 from modelo.partida import Partida
 
 
@@ -97,6 +98,7 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     partida = Partida(cripta, jugador, semilla, version_catalogo,
                       fabrica=fabrica_botin, resolver_ficha=_resolvedor_fichas(red))
     partida.al_morir_enemigo.agregarValor(red.notificar_muerte_enemigo)
+    partida.aplicar_efecto = efectos.aplicar_efecto_objeto
     partida.inicializar()
 
     bitacora = None
