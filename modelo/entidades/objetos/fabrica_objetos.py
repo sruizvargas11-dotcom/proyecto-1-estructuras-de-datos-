@@ -11,22 +11,29 @@ from modelo.entidades.objetos.pergamino_retroceso import PergaminoRetroceso
 
 class FabricaObjetos:
     """
-    Debe existir una sola fábrica compartida por partida.
+    Debe existir una sola fábrica por ORIGEN de objetos en cada partida.
 
-    siguiente_id identifica la próxima instancia que se creará.
+    siguiente_id identifica la próxima instancia que se creará. El prefijo separa
+    los orígenes: el contenido de las salas usa "objeto" (sus ids dependen solo del
+    orden de número de las solicitudes de red) y el botín de los enemigos usa
+    "botin" (sus ids dependen solo de las acciones). Así ninguno depende de cuándo
+    llega una respuesta y los ids son únicos entre ambos.
     """
 
-    def __init__(self, siguiente_id=1):
+    def __init__(self, siguiente_id=1, prefijo="objeto"):
         if type(siguiente_id) is not int or siguiente_id < 1:
             raise ValueError(
                 "La secuencia debe empezar en un entero positivo."
             )
+        if not isinstance(prefijo, str) or not prefijo or ":" in prefijo:
+            raise ValueError("El prefijo debe ser texto sin ':'.")
 
         self.siguiente_id = siguiente_id
+        self.prefijo = prefijo
 
     def crear(self, ficha):
         comunes = (
-            f"objeto:{self.siguiente_id}",
+            f"{self.prefijo}:{self.siguiente_id}",
             ficha["id"],
             ficha["nombre"],
             ficha["peso"],

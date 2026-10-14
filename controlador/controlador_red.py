@@ -1,8 +1,3 @@
-"""Carga desde la red o el disco. La fuente decide si los datos vienen de HTTP o de archivos.
-
-Bloque 1: carga inicial del esqueleto (cargar_cripta).
-Bloque 2: precarga y carga de contenido y catálogo (ControladorRed).
-"""
 import os
 from math import isfinite
 
@@ -20,8 +15,10 @@ from persistencia.cache_json import validar_identificador
 from estructuras.lista_simple import ListaSimple
 from estructuras.cola import Cola
 from estructuras.vector_dinamico import Vector
-from estructuras.array_ordenado import ArrayOrdenado
 from estructuras.listalru import ListaLRU
+from estructuras.ordenamientos import ordenar
+from controlador.buffer_reordenamiento import BufferReordenamiento
+from controlador.despacho_red import DespachoInmediato
 
 def _exigir(condicion, mensaje):
     if not condicion:
@@ -144,23 +141,73 @@ def _contiene(vector, valor):
     return False
 
 
+def _comparar_registro(a, b):
+    ka, kb = (a[0], a[1]), (b[0], b[1])
+    return (ka > kb) - (ka < kb)
+
+
+class _SolicitudContenido:
+    """Un lote de hasta 10 salas decidido en un punto determinista del juego."""
+
+    def __init__(self, sala_ids, origen):
+        self.numero = None
+        self.sala_ids = sala_ids        # Vector, en el orden del lote
+        self.origen = origen            # 'precarga' | 'garantizar' | 'directa'
+        self.datos_lote = Vector()      # pares (sala_id, datos | None)
+        self.faltantes = []             # list solo como parámetro de la fuente
+        self.error = None
+        self.terminada = False
+        self.incorporadas = 0
+
+    def contiene(self, sala_id):
+        return _contiene(self.sala_ids, sala_id)
+
+
 class ControladorRed:
+    """Carga de contenido y catálogo con orden determinista (B2 + B3 ajuste 6).
+
+    Ciclo de una solicitud de contenido:
+      1. DECIDIR (hilo principal, solo con estado del juego): planificar_precarga,
+         procesar_cola, garantizar_contenido o solicitar_contenido_lote arman un
+         lote de salas aún no solicitadas. Se lee del disco lo vigente.
+      2. NUMERAR: el lote recibe el siguiente número en el buffer de reordenamiento,
+         aunque todo venga de disco (así el orden de incorporación no depende de la
+         caché). Se anota en el registro de solicitudes.
+      3. ENVIAR: si faltan salas, el despachador llama a la fuente (en el acto o en
+         otro hilo). La respuesta se entrega al buffer.
+      4. INCORPORAR (hilo principal, en puntos fijos): incorporar_listas() toma las
+         respuestas estrictamente en orden de número, resuelve su catálogo (también
+         numerado, como sub-solicitudes n.1, n.2...) y puebla las salas.
+         Incorporar NO activa enemigos ni programa eventos (§2.4).
+    Puntos fijos: antes de cada acción del jugador (lo llama el controlador del
+    juego), dentro de garantizar_contenido / asegurar_entrada y al final de
+    procesar_cola.
+    """
 
     MAX_LOTE = 10
+    REINTENTOS_CONTENIDO = 1          # reintentos extra al garantizar una sala
+    ESPERA_MAXIMA_SEGUNDOS = 120.0    # tiempo real máximo esperando una respuesta
 
     def __init__(self, fuente, cripta, carpeta_cache=None, fabrica=None,
-                 version_catalogo=None, cache_size = 25):
+                 version_catalogo=None, cache_size = 25, despachador=None):
         self._fuente = fuente
         self._cripta = cripta
         self._cache = carpeta_cache if carpeta_cache is not None else _carpeta_cache_por_defecto()
-        # debe existir una sola fábrica por partida (ver FabricaObjetos).
+        # Una fábrica propia para el contenido: sus ids dependen solo del orden de
+        # número de las solicitudes (el botín de Partida usa otra fábrica).
         self._fabrica = fabrica if fabrica is not None else FabricaObjetos()
         # se pide a la fuente una sola vez y solo si hace falta consultar disco.
         self._version_catalogo = version_catalogo
+        self._despachador = despachador if despachador is not None else DespachoInmediato()
 
         self._pendientes = Cola()
         self._encoladas = Vector()
         self._incorporadas = Vector()
+        self._solicitadas = Vector()      # en vuelo o incorporadas: no se piden otra vez
+        self._buffer = BufferReordenamiento()
+        self._registro = Vector()         # (numero, sub, clase, ids, en_red)
+        self._numero_en_curso = None      # solicitud de contenido que se incorpora
+        self._sub_catalogo = 0
         self._fichas = ListaLRU(capacidad = cache_size)
         self._tipos_descubiertos = Vector()
 
@@ -174,13 +221,29 @@ class ControladorRed:
         self.contador_salas_desde_disco = 0
         self.contador_fichas_desde_disco = 0
         self.contador_precargas_fallidas = 0
+        self.contador_esperas_bloqueantes = 0
 
 
     def contenido_cargado(self, sala_id):
         return _contiene(self._incorporadas, sala_id)
 
+    def contenido_solicitado(self, sala_id):
+        """True si la sala ya fue pedida o incorporada."""
+        return _contiene(self._solicitadas, sala_id)
+
     def pendientes(self):
         return len(self._pendientes)
+
+    def solicitudes_en_vuelo(self):
+        return self._buffer.en_vuelo()
+
+    def registro_solicitudes(self):
+        """Copia ordenada por (numero, sub) de (numero, sub, clase, ids, en_red)."""
+        copia = Vector()
+        for entrada in self._registro:
+            copia.agregarValor(entrada)
+        ordenar(copia, _comparar_registro)
+        return copia
 
     def ficha(self, tipo_id):
         """Ficha ya resuelta, o None. O(k) acotado por cache_size: busca en
@@ -188,11 +251,31 @@ class ControladorRed:
         return self._fichas.buscar(tipo_id)
     
     def notificar_muerte_enemigo(self, enemigo):
-        """ROL 4 DEBE llamar esto justo cuando enemigo.vivo pase a False
-        (por ejemplo, justo después de Actor.recibir_dano/morir), para que
-        su ficha deje de estar protegida y vuelva a ser candidata a desalojo.
-        Sin esta llamada, la ficha queda protegida para siempre."""
         self._fichas.desmarcar_en_uso(enemigo.tipo_id)
+
+    def proteger_fichas(self, tipo_ids):
+        """Marca en_uso las fichas de objetos/trampas de la sala actual e inventario."""
+        self.resolver_catalogo(tipo_ids)
+        for tipo_id in tipo_ids:
+            try:
+                self._fichas.marcar_en_uso(tipo_id)
+            except KeyError:
+                pass
+
+    def liberar_fichas(self, tipo_ids):
+        """Inverso de proteger_fichas; tolera fichas ya liberadas o desalojadas."""
+        for tipo_id in tipo_ids:
+            try:
+                self._fichas.desmarcar_en_uso(tipo_id)
+            except (KeyError, ValueError):
+                pass
+
+    def version_catalogo(self):
+        """Versión vigente del catálogo como texto (bitácora y guardado)."""
+        version = self._persistencia_catalogo().version
+        if isinstance(version, dict):
+            version = version.get("version")
+        return version
 
     def tipos_descubiertos(self):
         """tipo_ids en el orden en que aparecieron en el contenido."""
@@ -206,11 +289,16 @@ class ControladorRed:
             ("salas_desde_disco", self.contador_salas_desde_disco),
             ("fichas_desde_disco", self.contador_fichas_desde_disco),
             ("precargas_fallidas", self.contador_precargas_fallidas),
-        )
+            ("esperas_bloqueantes", self.contador_esperas_bloqueantes),
+        ) + self._buffer.contadores()
+
+    def cerrar(self, tiempo_maximo=None):
+        """Espera los hilos de red pendientes (al terminar la sesión)."""
+        self._despachador.cerrar(tiempo_maximo)
 
 
     def planificar_precarga(self, sala_actual):
-
+        """Encola vecinas directas y vecinas de vecinas no solicitadas. No envía."""
         nuevas = 0
         directas = Vector()
 
@@ -231,120 +319,137 @@ class ControladorRed:
         return nuevas
 
     def procesar_cola(self):
+        """Envía un lote (máx. 10) de la cola e incorpora lo que ya esté listo.
 
+        Con DespachoInmediato devuelve las salas incorporadas de ese lote; con hilos
+        puede devolver 0 y la incorporación ocurre en un punto fijo posterior.
+        Un fallo de precarga no detiene el juego: queda en ultimo_error.
+        """
         lote = Vector()
         self._completar_lote(lote)
         if len(lote) == 0:
             return 0
         self.ultimo_error = None
         try:
-            return self.solicitar_contenido_lote(lote)
+            self._enviar_lote(lote, "precarga")
         except (RuntimeError, ValueError, OSError) as error:
-            self.ultimo_error = f"Precarga de salas {self._texto_ids(lote)}: {error}"
-            self.contador_precargas_fallidas += 1
+            self._fallo(lote, error)
             return 0
-
+        return self.incorporar_listas()
 
     def solicitar_contenido_lote(self, sala_ids):
-        """
-        Carga el contenido de hasta 10 salas y lo incorpora al modelo:
-          1. Las salas ya incorporadas se omiten.
-          2. Las que están en disco con la versión vigente no generan request.
-          3. Las demás se piden en UNA sola solicitud.
-          4. Se descubren los tipo_ids nuevos y se resuelven en lotes.
-          5. Se pueblan enemigos_dormidos, objetos_suelo y trampas.
-        Devuelve cuántas salas se incorporaron.
-        """
+        """Carga hasta 10 salas y espera a que queden incorporadas.
+        
+          Devuelve cuántas salas de ESTE lote se incorporaron."""
         if len(sala_ids) > self.MAX_LOTE:
             raise ValueError(f"Un lote admite como máximo {self.MAX_LOTE} salas.")
 
+        # 1. Clasificar las salas pedidas:
         por_cargar = Vector()
+        espera_hasta = 0
         for sala_id in sala_ids:
-            if type(sala_id) is not int or sala_id < 0:
-                raise ValueError("El identificador de sala debe ser un entero no negativo.")
-            if self._cripta.sala_por_id(sala_id) is None:
-                raise ValueError(f"La sala {sala_id} no existe en la cripta.")
-            if not self.contenido_cargado(sala_id) and not _contiene(por_cargar, sala_id):
+            self._validar_sala(sala_id)
+            en_vuelo = self._solicitud_de(sala_id)
+            if en_vuelo is not None:
+                espera_hasta = max(espera_hasta, en_vuelo.numero)
+            elif not self.contenido_solicitado(sala_id) and not _contiene(por_cargar, sala_id):
                 por_cargar.agregarValor(sala_id)
-        if len(por_cargar) == 0:
+
+        # 2-3. Enviar el lote propio como UNA solicitud numerada.
+        propia = None
+        if len(por_cargar) > 0:
+            try:
+                propia = self._enviar_lote(por_cargar, "directa")
+            except (RuntimeError, ValueError, OSError) as error:
+                self._fallo(por_cargar, error)
+                raise
+            espera_hasta = max(espera_hasta, propia.numero)
+
+        # 4. Esperar (tiempo real) hasta el mayor número involucrado e incorporar
+        #    en orden de número, incluidas las solicitudes anteriores pendientes.
+        if espera_hasta:
+            self._esperar_e_incorporar(espera_hasta)
+
+        # 5. Resultado: 0 si todo ya estaba pedido o cargado
+        if propia is None:
             return 0
-        try:
-            return self._cargar_lote(por_cargar)
-        except Exception:
-            # También protege las llamadas directas, no solo la precarga.
-            self._restaurar_lote(por_cargar)
-            raise
-
-    def _cargar_lote(self, por_cargar):
-        datos_lote = Vector()     # pares (sala_id, datos) en el orden del lote
-        faltantes = []            # list solo como parámetro del contrato de la fuente
-        for sala_id in por_cargar:
-            datos = self._pers_contenido.cargar(self._cripta.id, sala_id)
-            if datos is not None:
-                try:
-                    self._validar_contenido(sala_id, datos)
-                except ValueError:
-                    datos = None  # Una copia dañada se recupera desde la fuente.
-            if datos is None:
-                faltantes.append(sala_id)
-            else:
-                self.contador_salas_desde_disco += 1
-            datos_lote.agregarValor((sala_id, datos))
-
-        if faltantes:
-            respuesta = self._fuente.contenido_salas(self._cripta.id, faltantes)
-            self.contador_solicitudes_contenido += 1
-            # Completar en el orden solicitado, no en el orden de red/disco.
-            for indice, (sala_id, datos) in enumerate(datos_lote):
-                if datos is None:
-                    datos = self._buscar_en_respuesta(respuesta, sala_id)
-                    datos_lote.asignarValor(indice, (sala_id, datos))
-
-        # Todas las fichas del lote se resuelven juntas: menos solicitudes.
-        self.resolver_catalogo(self._descubrir_tipos(datos_lote))
-        preparadas = Vector()
-        siguiente_id = self._fabrica.siguiente_id
-        try:
-            for sala_id, datos in datos_lote:
-                sala = self._cripta.sala_por_id(sala_id)
-                try:
-                    preparadas.agregarValor((sala, self._incorporar(sala, datos)))
-                except ValueError:
-                    if sala_id not in faltantes:
-                        self._pers_contenido.invalidar(self._cripta.id, sala_id)
-                    raise
-            # Solo se persisten contenidos que pudieron construirse por completo.
-            for sala_id, datos in datos_lote:
-                if sala_id in faltantes:
-                    self._pers_contenido.guardar(self._cripta.id, sala_id, datos)
-        except Exception:
-            self._fabrica.siguiente_id = siguiente_id
-            raise
-        for sala, (enemigos, objetos, trampas) in preparadas:
-            sala.enemigos_dormidos = enemigos
-            sala.objetos_suelo = objetos
-            sala.trampas = trampas
-            self._incorporadas.agregarValor(sala.id)
-        return len(preparadas)
+        if propia.error is not None:
+            raise propia.error
+        return propia.incorporadas
 
     def garantizar_contenido(self, sala_id):
-        if type(sala_id) is not int or sala_id < 0:
-            raise ValueError("El identificador de sala debe ser un entero no negativo.")
-        sala = self._cripta.sala_por_id(sala_id)
-        if sala is None:
-            raise ValueError(f"La sala {sala_id} no existe en la cripta.")
-        if self.contenido_cargado(sala_id):
-            return sala
+        """Bloqueante: devuelve la sala con su contenido ya incorporado.
 
-        lote = Vector()
-        lote.agregarValor(sala_id)
-        self._completar_lote(lote)
-        self.solicitar_contenido_lote(lote)
+        Si la sala está en vuelo espera esa respuesta (y las anteriores); si no fue
+        pedida arma un lote con ella primero y lo completa con la cola. Reintenta
+        dentro del presupuesto; si aun así falla re-lanza el error original.
+        Esperar es tiempo real: el reloj virtual no se toca aquí.
+        """
+        sala = self._validar_sala(sala_id)
+        self.incorporar_listas()
+        intentos = 0
+        while not self.contenido_cargado(sala_id):
+            solicitud = self._solicitud_de(sala_id)
+            if solicitud is None:
+                lote = Vector()
+                lote.agregarValor(sala_id)
+                self._completar_lote(lote)
+                try:
+                    solicitud = self._enviar_lote(lote, "garantizar")
+                except (RuntimeError, ValueError, OSError) as error:
+                    self._fallo(lote, error)
+                    raise
+            else:
+                self.contador_esperas_bloqueantes += 1
+            self._esperar_e_incorporar(solicitud.numero)
+            if self.contenido_cargado(sala_id):
+                break
+            error = solicitud.error
+            if error is None:
+                continue  # la sala viajaba en otra solicitud ya resuelta
+            if not self._puede_reintentar(error, intentos):
+                raise error
+            intentos += 1
         return sala
 
+    def asegurar_entrada(self, sala_id):
+        """Para el movimiento del jugador hacia una sala."""
+        try:
+            self.garantizar_contenido(sala_id)
+            return None #devuelve None si el contenido quedó disponible
+        except (RuntimeError, ValueError, OSError) as error:
+            return f"No se puede entrar a la sala {sala_id}: su contenido no está disponible ({error})."
+
+    def incorporar_listas(self):
+        """PUNTO FIJO: incorpora, en orden de número, las respuestas ya llegadas."""
+        total = 0
+        while True:
+            tomada = self._buffer.tomar_siguiente()
+            if tomada is None:
+                return total
+            solicitud, respuesta, error = tomada
+            if solicitud is None:      # ranura de un catálogo ya resuelto
+                continue
+            try:
+                if error is not None:
+                    raise error
+                total += self._completar_solicitud(solicitud, respuesta)
+            except (RuntimeError, ValueError, OSError) as fallo:
+                self._fallo(solicitud.sala_ids, fallo, solicitud)
+            solicitud.terminada = True
+
+    def esperar_todas(self):
+        """Espera e incorpora todo lo que está en vuelo (replay, bench, guardar).
+        Devuelve cuántas salas incorporó. Tiempo real; el reloj virtual no cambia.
+        """
+        if self._buffer.en_vuelo() == 0:
+            return self.incorporar_listas()
+        antes = len(self._incorporadas)
+        self._esperar_e_incorporar(self._buffer.proximo_numero - 1)
+        return len(self._incorporadas) - antes
 
     def resolver_catalogo(self, tipo_ids):
-
+        """Asegura en memoria las fichas: LRU -> disco -> red (lotes de 10)"""
         sin_memoria = Vector()
         for tipo_id in tipo_ids:
             validar_identificador(tipo_id)
@@ -371,6 +476,7 @@ class ControladorRed:
         inicio = 0
         while inicio < len(a_red):
             lote = a_red[inicio:inicio + self.MAX_LOTE]
+            self._anotar_catalogo(lote)
             respuesta = self._fuente.catalogo(lote)
             self.contador_solicitudes_catalogo += 1
             for tipo_id in lote:
@@ -382,6 +488,162 @@ class ControladorRed:
         return len(a_red)
 
 
+    def _validar_sala(self, sala_id):
+        if type(sala_id) is not int or sala_id < 0:
+            raise ValueError("El identificador de sala debe ser un entero no negativo.")
+        sala = self._cripta.sala_por_id(sala_id)
+        if sala is None:
+            raise ValueError(f"La sala {sala_id} no existe en la cripta.")
+        return sala
+
+    def _solicitud_de(self, sala_id):
+        """Solicitud en vuelo que contiene la sala, o None."""
+        for solicitud in self._buffer.pendientes():
+            if solicitud.contiene(sala_id):
+                return solicitud
+        return None
+
+    def _enviar_lote(self, sala_ids, origen):
+        """Pasos 1-3: lee disco, numera, anota y envía. Devuelve la solicitud."""
+        solicitud = _SolicitudContenido(sala_ids, origen)
+        for sala_id in sala_ids:
+            datos = self._pers_contenido.cargar(self._cripta.id, sala_id)
+            if datos is not None:
+                try:
+                    self._validar_contenido(sala_id, datos)
+                except ValueError:
+                    datos = None  # Una copia dañada se recupera desde la fuente.
+            if datos is None:
+                solicitud.faltantes.append(sala_id)
+            solicitud.datos_lote.agregarValor((sala_id, datos))
+
+        numero = self._buffer.reservar(solicitud)
+        solicitud.numero = numero
+        for sala_id in sala_ids:
+            if not _contiene(self._solicitadas, sala_id):
+                self._solicitadas.agregarValor(sala_id)
+        en_red = len(solicitud.faltantes) > 0
+        self._registro.agregarValor((numero, 0, "contenido", tuple(sala_ids), en_red))
+
+        if not en_red:
+            self._buffer.entregar(numero)
+            return solicitud
+        self.contador_solicitudes_contenido += 1
+        faltantes = list(solicitud.faltantes)
+        cripta_id = self._cripta.id
+        fuente = self._fuente
+        buffer = self._buffer
+        self._despachador.enviar(
+            lambda: fuente.contenido_salas(cripta_id, faltantes),
+            lambda respuesta, error: buffer.entregar(numero, respuesta, error))
+        return solicitud
+
+    def _esperar_e_incorporar(self, numero):
+        """Espera en tiempo real a que lleguen todas las respuestas <= numero."""
+        if not self._buffer.esperar(numero, self.ESPERA_MAXIMA_SEGUNDOS):
+            self._buffer.abandonar_hasta(numero, RuntimeError(
+                "La fuente de datos no respondió a tiempo."))
+        self.incorporar_listas()
+
+    def _completar_solicitud(self, solicitud, respuesta):
+        """Paso 4 para UNA solicitud (ya en su turno). Todo o nada."""
+        datos_lote = solicitud.datos_lote
+        for indice, (sala_id, datos) in enumerate(datos_lote):
+            if datos is None:
+                datos_lote.asignarValor(indice, (sala_id, self._buscar_en_respuesta(respuesta, sala_id)))
+            else:
+                self.contador_salas_desde_disco += 1
+
+        self._numero_en_curso, self._sub_catalogo = solicitud.numero, 0
+        try:
+            # Todas las fichas del lote se resuelven juntas: menos solicitudes.
+            self.resolver_catalogo(self._descubrir_tipos(datos_lote))
+            preparadas = self._preparar(datos_lote, solicitud.faltantes)
+            for sala, (enemigos, objetos, trampas) in preparadas:
+                sala.enemigos_dormidos = enemigos
+                sala.objetos_suelo = objetos
+                sala.trampas = trampas
+                self._incorporadas.agregarValor(sala.id)
+                self._marcar_enemigos_en_uso(enemigos)
+            solicitud.incorporadas = len(preparadas)
+            self._resolver_botin(preparadas)
+        finally:
+            self._numero_en_curso = None
+        return solicitud.incorporadas
+
+    def _preparar(self, datos_lote, faltantes):
+        """Construye las entidades del lote sin publicarlas; si algo falla, no gasta ids."""
+        preparadas = Vector()
+        siguiente_id = self._fabrica.siguiente_id
+        try:
+            for sala_id, datos in datos_lote:
+                sala = self._cripta.sala_por_id(sala_id)
+                try:
+                    preparadas.agregarValor((sala, self._incorporar(sala, datos)))
+                except ValueError:
+                    if sala_id not in faltantes:
+                        self._pers_contenido.invalidar(self._cripta.id, sala_id)
+                    raise
+            # Solo se persisten contenidos que pudieron construirse por completo.
+            for sala_id, datos in datos_lote:
+                if sala_id in faltantes:
+                    self._pers_contenido.guardar(self._cripta.id, sala_id, datos)
+        except Exception:
+            self._fabrica.siguiente_id = siguiente_id
+            raise
+        return preparadas
+
+    def _marcar_enemigos_en_uso(self, enemigos):
+        # Un enemigo vivo protege su ficha sin importar la sala
+        for enemigo in enemigos:
+            self._fichas.marcar_en_uso(enemigo.tipo_id)
+
+    def _resolver_botin(self, preparadas):
+        """Deja en memoria/disco las fichas de 'suelta' de los enemigos del lote."""
+        tipos = Vector()
+        for _, (enemigos, _, _) in preparadas:
+            for enemigo in enemigos:
+                for tipo_id in enemigo.suelta:
+                    if not _contiene(tipos, tipo_id):
+                        tipos.agregarValor(tipo_id)
+        if len(tipos) == 0:
+            return
+        try:
+            self.resolver_catalogo(tipos)
+        except (RuntimeError, ValueError, OSError) as error:
+            self.ultimo_error = f"Botín {self._texto_ids(tipos)}: {error}"
+
+    def _anotar_catalogo(self, lote):
+        if self._numero_en_curso is not None:
+            self._sub_catalogo += 1
+            numero, sub = self._numero_en_curso, self._sub_catalogo
+        else:
+            # Catálogo fuera de una incorporación (p. ej. botín): número propio. Se
+            # resuelve en el acto; su ranura vacía solo conserva la numeración.
+            numero, sub = self._buffer.reservar(None), 0
+            self._buffer.entregar(numero)
+        self._registro.agregarValor((numero, sub, "catalogo", tuple(lote), True))
+
+    def _fallo(self, sala_ids, error, solicitud=None):
+        """Las salas vuelven a ser pedibles y a la cola; se informa sin caer."""
+        for sala_id in sala_ids:
+            for indice, solicitada in enumerate(self._solicitadas):
+                if solicitada == sala_id:
+                    self._solicitadas.eliminar(indice)
+                    break
+        self._restaurar_lote(sala_ids)
+        if solicitud is not None:
+            solicitud.error = error
+            if solicitud.origen == "precarga":
+                self.contador_precargas_fallidas += 1
+        self.ultimo_error = f"Salas {self._texto_ids(sala_ids)}: {error}"
+
+    def _puede_reintentar(self, error, intentos):
+        if intentos >= self.REINTENTOS_CONTENIDO or isinstance(error, ValueError):
+            return False
+        dentro = getattr(self._fuente, "dentro_del_presupuesto", None)
+        return dentro is None or dentro()
+
     def _destino(self, salida):
         destino = salida.sala_destino
         if destino is None:
@@ -391,7 +653,7 @@ class ControladorRed:
         return destino
 
     def _encolar(self, sala_id):
-        if _contiene(self._encoladas, sala_id) or self.contenido_cargado(sala_id):
+        if _contiene(self._encoladas, sala_id) or self.contenido_solicitado(sala_id):
             return False
         self._pendientes.encolar(sala_id)
         self._encoladas.agregarValor(sala_id)
@@ -410,7 +672,7 @@ class ControladorRed:
                 if encolada == sala_id:
                     self._encoladas.eliminar(indice)
                     break
-            if self.contenido_cargado(sala_id) or _contiene(lote, sala_id):
+            if self.contenido_solicitado(sala_id) or _contiene(lote, sala_id):
                 continue
             lote.agregarValor(sala_id)
 
@@ -451,9 +713,8 @@ class ControladorRed:
             ficha = self._ficha_de_clase(e["tipo"], ("enemigo",))
             enemigo = Enemigo.desde_ficha(e["instancia"], ficha, sala, e.get("vida"))
             enemigos.insertar_al_final(enemigo)
-            # Un enemigo vivo protege su ficha sin importar la sala.
-            # ROL 4 debe llamar notificar_muerte_enemigo(enemigo) cuando muera.
-            self._fichas.marcar_en_uso(e["tipo"])
+            # en_uso se marca al publicar el lote (_marcar_enemigos_en_uso), así un
+            # lote que falla a medias no deja fichas protegidas para siempre.
 
         for tipo_id in datos["objetos"]:
             ficha = self._ficha_de_clase(tipo_id, None)
