@@ -29,5 +29,7 @@ class Antorcha(Objeto):
             )
 
         self.duracion = duracion
+        self.encendida = False
+        self.evento_apagado = None
 
 

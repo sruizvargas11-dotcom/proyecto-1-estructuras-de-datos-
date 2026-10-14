@@ -44,6 +44,7 @@ class Enemigo(Actor):
 
         self.suelta = Vector()
         self.regeneracion = 0
+        self.evento_regeneracion = None
 
     @classmethod
     def desde_ficha(
