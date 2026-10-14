@@ -1,3 +1,4 @@
+from controlador.estado_final import lineas_estado
 from controlador.narrador_eventos import describir_evento
 from estructuras.vector_dinamico import Vector
 from modelo.entidades.enemigo import Enemigo
@@ -132,11 +133,13 @@ class ControladorJuego:
 
     def jugar(self):
         """Bucle principal: ciclos de 4 pasos mientras la partida siga activa."""
+        completa = False
         try:
             while not self.partida.terminada and not self._salir:
                 self.ciclo()
+            completa = True
         finally:
-            self._cerrar()
+            self._cerrar(completa)
         return self.partida.estado
 
     def ciclo(self):
@@ -429,10 +432,17 @@ class ControladorJuego:
         if self.bitacora is not None:
             self.bitacora.registrar(self.reloj.tiempo_actual, texto)
 
-    def _cerrar(self):
-        """Fin de sesión: cierra el intervalo abierto, la bitácora y la red."""
+    def _cerrar(self, completa=True):
+        """Fin de sesión: cierra el intervalo abierto, la bitácora y la red.
+
+        El cierre (estado final completo) solo se escribe si el bucle terminó
+        sin errores; tras una excepción el estado no es un resultado válido.
+        """
         if self.historial.registrando:
             self.historial.confirmar_accion()
+        if self.bitacora is not None and completa:
+            self.bitacora.registrar_cierre(self.reloj.tiempo_actual, self.partida.estado,
+                                           lineas_estado(self.partida))
         if self.bitacora is not None:
             self.bitacora.cerrar()
         self.red.cerrar(5)

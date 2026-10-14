@@ -3,9 +3,11 @@
     python main.py --offline              juega con los datos locales
     python main.py                        juega contra el servicio HTTP
     python main.py --offline --solo-mapa  solo carga y verifica el mapa (bloque 1)
+    python main.py --replay partida.log   reproduce una bitácora sin interacción
 """
 import argparse
 from controlador.controlador_red import cargar_cripta
+from controlador.reporte_red import motivo_error, motivo_partida, registrar_reporte
 
 
 def crear_fuente(argumentos):
@@ -27,9 +29,18 @@ def main(argumentos=None):
                         help='Fichas de catálogo en memoria (LRU), por defecto 25')
     parser.add_argument('--hilos', action='store_true',
                         help='Precarga de salas en segundo plano')
+    parser.add_argument('--replay', metavar='LOG',
+                        help='Reproducir una bitácora de partida sin interacción')
+    parser.add_argument('--silencioso', action='store_true',
+                        help='Con --replay: no listar cada acción, solo el resultado')
+    parser.add_argument('--reportes', metavar='ARCHIVO',
+                        help='Historial de reportes de red (por defecto partidas/reportes_red.txt)')
     opciones = parser.parse_args(argumentos)
+    fuente = None
     try:
         fuente = crear_fuente(['--offline'] if opciones.offline else [])
+        if opciones.replay:
+            return reproducir(fuente, opciones)
         cripta_id = opciones.cripta
         if cripta_id is None:
             respuesta = fuente.listar_criptas()
@@ -55,7 +66,16 @@ def main(argumentos=None):
         return jugar(fuente, cripta_id, opciones)
     except (OSError, ValueError, RuntimeError) as error:
         print(f'No se pudo cargar la cripta: {error}')
+        if fuente is not None and not opciones.solo_mapa and not getattr(error, 'reportado', False):
+            _mostrar_reporte(fuente, None, 'replay' if opciones.replay else 'partida',
+                             motivo_error(error), opciones)
         return 1
+
+
+def _mostrar_reporte(fuente, sesion, modo, motivo, opciones, bitacora=None):
+    print('')
+    print(registrar_reporte(fuente, sesion, modo, motivo, ruta=opciones.reportes,
+                            bitacora=bitacora))
 
 
 def jugar(fuente, cripta_id, opciones):
@@ -67,14 +87,63 @@ def jugar(fuente, cripta_id, opciones):
     from vista.vista_consola import VistaConsola
 
     semilla = generar_semilla()
+    ruta_log = ruta_bitacora_por_defecto(cripta_id, semilla)
     sesion = nueva_partida(
         fuente, cripta_id, opciones.cache_dir, semilla=semilla,
-        ruta_bitacora=ruta_bitacora_por_defecto(cripta_id, semilla),
+        ruta_bitacora=ruta_log,
         cache_size=opciones.cache_size,
         despachador=DespachoEnHilos() if opciones.hilos else None)
     vista = VistaConsola()
     vista.mostrar_inicio(cripta_id, semilla)
-    ControladorJuego(sesion, vista).jugar()
+    try:
+        ControladorJuego(sesion, vista).jugar()
+    except Exception as error:
+        _mostrar_reporte(fuente, sesion, 'partida', motivo_error(error), opciones, ruta_log)
+        error.reportado = True
+        raise
+    _mostrar_reporte(fuente, sesion, 'partida', motivo_partida(sesion.partida.estado),
+                     opciones, ruta_log)
+    return 0
+
+
+def reproducir(fuente, opciones):
+    """--replay: sin vista interactiva. Códigos de salida: 0 idéntico,
+    2 versión incompatible, 3 la reproducción divergió del log."""
+    from bitacora_partida import ErrorVersionIncompatible
+    from controlador.controlador_replay import ErrorReplayDivergente, reproducir as replay
+
+    print(f'Reproduciendo {opciones.replay}')
+    try:
+        resultado = replay(opciones.replay, fuente, opciones.cache_dir,
+                           escribir=None if opciones.silencioso else print)
+    except ErrorVersionIncompatible as error:
+        print(f'Replay detenido: {error}')
+        _mostrar_reporte(fuente, error.sesion, 'replay',
+                         f'replay detenido, versión incompatible: {error}', opciones,
+                         opciones.replay)
+        return 2
+    except ErrorReplayDivergente as error:
+        print(f'Replay divergente: {error}')
+        _mostrar_reporte(fuente, error.sesion, 'replay', f'replay divergente: {error}',
+                         opciones, opciones.replay)
+        return 3
+    partida = resultado.partida
+    print('')
+    print(f'Resultado: {partida.estado} | t={partida.tiempo} | '
+          f'{len(resultado.acciones)} acciones reproducidas')
+    for campo, valor in partida.resumen_puntaje():
+        print(f'  {campo}: {valor}')
+    if resultado.verificado:
+        print(f'Estado final idéntico al registrado en la bitácora '
+              f'({len(resultado.lineas_estado)} líneas comparadas): reproducción idéntica.')
+    else:
+        print('La bitácora no trae el estado final (la partida original no terminó '
+              'de forma controlada); se reprodujeron todas sus acciones sin errores.')
+    verificacion = ('idéntico a la partida original' if resultado.verificado
+                    else 'sin estado final para comparar')
+    _mostrar_reporte(fuente, resultado.sesion, 'replay',
+                     f'replay completo, {verificacion}; {motivo_partida(partida.estado)}',
+                     opciones, opciones.replay)
     return 0
 
 

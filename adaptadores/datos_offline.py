@@ -49,9 +49,9 @@ class DatosOffline(FuenteDeDatos):
             raise FileNotFoundError(
                 f"Ninguna cripta de criptas.json está descargada en '{self._carpeta}'. "
                 "Descarga una con: python -m herramientas.descargar_offline <cripta_id>")
-        filtrada = dict(respuesta)
-        filtrada["criptas"] = disponibles
-        return filtrada
+        # respuesta se acaba de leer del archivo: se ajusta ella misma, sin copiarla.
+        respuesta["criptas"] = disponibles
+        return respuesta
 
     # QUE CAMBIÓ:
     # los metodos retornan exactamente lo mismo que su estado previo

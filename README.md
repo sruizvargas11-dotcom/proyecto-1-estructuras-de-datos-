@@ -19,7 +19,9 @@ python main.py --offline --solo-mapa      # solo carga y verifica el mapa (bloqu
 ```
 
 Cada partida nueva genera su semilla y escribe su bitácora en
-`partidas/bitacoras/<cripta>_<semilla>.log`.
+`partidas/bitacoras/<cripta>_<semilla>.log`. Al terminar (victoria, derrota o `Q`)
+se agrega la línea `t=<t> fin <estado>` y, debajo, el estado final completo (jugador,
+inventario, cada sala, y el siguiente valor del azar) en líneas que empiezan con `= `.
 
 | Comando | Acción | Costo |
 | --- | --- | --- |
@@ -45,3 +47,30 @@ los últimos 20 mensajes. Los efectos del entorno (pulsos de veneno, rearme de
 trampas, cierre de puertas, antorcha que se apaga) se narran con
 `controlador/narrador_eventos.py`. Guardar y cargar (`G`/`L`) se agregan en el
 bloque 4 junto con el guardado binario.
+
+## Reproducir una partida
+
+```
+python main.py --offline --replay partidas/bitacoras/cripta-01_123.log
+python main.py --replay partidas/bitacoras/cripta-01_123.log --silencioso
+```
+
+No pide ningún comando ni abre la vista de consola. Antes de ejecutar compara las
+versiones de cripta y catálogo del log con las actuales y se detiene si no
+coinciden (salida 2). Durante la reproducción verifica que cada acción llegue en
+el mismo `t` y no sea rechazada, y al final compara línea por línea el estado
+final con el del log, indicando la primera línea distinta
+(salida 3 si algo difiere; 0 si es idéntica).
+
+## Reporte final de red
+
+Al terminar una partida (victoria, derrota, `Q` o error) y al terminar un `--replay`,
+el programa muestra el reporte de red y lo agrega a `partidas/reportes_red.txt`
+(`--reportes ARCHIVO` para otra ruta). Cada reporte indica cripta, versiones,
+semilla, bitácora, motivo de fin, solicitudes realizadas contra
+`presupuesto_solicitudes` (con desglose contenido / catálogo / otras), uso de la
+caché (esqueleto, salas y fichas desde disco o desde la fuente, aciertos y fallos
+de la LRU) y esperas de precarga.
+
+El historial se maneja como una `Pila` propia: el reporte más reciente queda
+arriba y, al superar 50, se descartan automáticamente los más viejos.
