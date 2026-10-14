@@ -1,17 +1,3 @@
-"""Arranque de una partida nueva: red/disco + semilla + bitácora + Partida.
-
-Orden (presupuesto de red mínimo):
-  1. Datos generales (una solicitud): versión, presupuesto y estadísticas del jugador.
-  2. Esqueleto: desde caché si la versión sigue vigente; si no, páginas + versión.
-  3. Primer lote: sala inicial + precarga de vecinas (y vecinas de vecinas) en UNA
-     solicitud de contenido; el catálogo de todo el lote se resuelve en lotes de 10.
-  4. Semilla: generada aquí (partida nueva) o recibida (replay / carga).
-  5. Partida.inicializar(): rastro t=0, jugador en t=0, enemigos de la sala inicial.
-  6. Bitácora: encabezado con cripta, versiones y semilla (si se pide ruta).
-
-La partida queda lista para que el controlador del juego (ROL 4) llame
-reloj.avanzar_hasta_turno(jugador) y pida la primera decisión.
-"""
 import os
 
 from bitacora_partida import BitacoraPartida
@@ -54,18 +40,6 @@ class _FuenteConGenerales:
         return getattr(self._fuente, nombre)
 
 
-def _version_catalogo(red):
-    """Texto de la versión del catálogo; la fuente la entrega como {"version": ...}.
-
-    Reutiliza la que ControladorRed ya obtuvo al resolver el catálogo del lote.
-    (Cuando se trabaje controlador_red.py conviene exponerlo como método público.)
-    """
-    version = red._persistencia_catalogo().version
-    if isinstance(version, dict):
-        version = version.get("version")
-    return version
-
-
 def _resolvedor_fichas(red):
     """resolver_ficha para la Partida: memoria (LRU) -> disco -> red."""
     def resolver(tipo_id):
@@ -87,7 +61,7 @@ def _validar_jugador(generales):
 
 
 def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
-                  ruta_bitacora=None, cache_size=25):
+                  ruta_bitacora=None, cache_size=25, despachador=None):
     """Crea e inicializa una partida. Devuelve SesionPartida.
 
     semilla=None  -> partida nueva: se genera automáticamente (nunca la elige el jugador).
@@ -95,6 +69,9 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     ruta_bitacora -> si se da, se crea la bitácora append-only con la semilla en el
                      encabezado. Use ruta_bitacora_por_defecto(...) para la ubicación
                      estándar.
+    despachador   -> None (DespachoInmediato) o DespachoEnHilos() para que la
+                     precarga viaje en segundo plano; el orden sigue siendo
+                     determinista gracias al buffer de reordenamiento.
     """
     semilla = generar_semilla() if semilla is None else validar_semilla(semilla)
 
@@ -102,20 +79,23 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     _validar_jugador(generales)
     cripta, _ = cargar_cripta(_FuenteConGenerales(fuente, generales), cripta_id, carpeta_cache)
 
-    fabrica = FabricaObjetos()                        # una sola por partida
-    red = ControladorRed(fuente, cripta, carpeta_cache, fabrica=fabrica,
-                         cache_size=cache_size)
+    # Dos fábricas con prefijo distinto: los ids del contenido dependen solo del
+    # orden de número de las solicitudes; los del botín, solo de las acciones.
+    fabrica_contenido = FabricaObjetos(prefijo="objeto")
+    fabrica_botin = FabricaObjetos(prefijo="botin")
+    red = ControladorRed(fuente, cripta, carpeta_cache, fabrica=fabrica_contenido,
+                         cache_size=cache_size, despachador=despachador)
     sala_inicial = cripta.sala_por_id(cripta.sala_inicial_id)
     # Encolar vecinas ANTES: garantizar_contenido completa el lote con ellas y todo
     # viaja en una sola solicitud de contenido.
     red.planificar_precarga(sala_inicial)
     red.garantizar_contenido(sala_inicial.id)
     # Para la bitácora; normalmente ya se obtuvo al resolver el catálogo del lote.
-    version_catalogo = _version_catalogo(red)
+    version_catalogo = red.version_catalogo()
 
     jugador = Jugador.desde_generales(generales, sala_inicial)
     partida = Partida(cripta, jugador, semilla, version_catalogo,
-                      fabrica=fabrica, resolver_ficha=_resolvedor_fichas(red))
+                      fabrica=fabrica_botin, resolver_ficha=_resolvedor_fichas(red))
     partida.al_morir_enemigo.agregarValor(red.notificar_muerte_enemigo)
     partida.inicializar()
 
