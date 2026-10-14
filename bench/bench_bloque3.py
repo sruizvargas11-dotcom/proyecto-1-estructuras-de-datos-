@@ -19,6 +19,12 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from persistencia.PartidaBinaria import PartidaBinaria
+from estructuras.vector_dinamico import Vector
+from estructuras.ordenamientos import ordenar
+
+
+def _comparar_pares(a, b):
+    return (a[0] > b[0]) - (a[0] < b[0])
 
 REPETICIONES = 5
 TAMANOS = [10, 100, 500]
@@ -61,7 +67,16 @@ def medir(func, repeticiones=REPETICIONES):
 
 def bench_tamano(num_salas, carpeta_tmp):
     estado_global, estado_salas = generar_estado(num_salas)
-    sala_media = sorted(estado_salas.keys())[num_salas // 2]
+
+    # ids ordenados con el ordenamiento propio (no sorted()), solo para
+    # elegir la sala "del medio" que se mide en cargar_sala_bin.
+    ids = Vector()
+    for sid in estado_salas:
+        ids.agregarValor(sid)
+    ordenar(ids, lambda a, b: (a > b) - (a < b))
+    sala_media = ids.obtenerValor(num_salas // 2)
+
+    pares_salas = [(sid, datos) for sid, datos in estado_salas.items()]
 
     ruta_bin = os.path.join(carpeta_tmp, f"partida_{num_salas}.bin")
     ruta_json = os.path.join(carpeta_tmp, f"partida_{num_salas}.json")
@@ -70,7 +85,7 @@ def bench_tamano(num_salas, carpeta_tmp):
     estado_equivalente = {"global": estado_global, "salas": estado_salas}
 
     def guardar_bin():
-        partida.guardar(estado_global, estado_salas)
+        partida.guardar(estado_global, pares_salas)
 
     def guardar_json():
         with open(ruta_json, "w", encoding="utf-8") as f:
