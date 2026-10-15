@@ -5,6 +5,7 @@ No consumen tiempo: suceden en el instante de ejecución de la acción.
 """
 from modelo.deltas import DeltaPuerta, DeltaTrampa
 from modelo.reloj import entero
+from modelo.ejecutor_evento import EjecutorEvento
 
 
 class Entorno:
@@ -31,9 +32,7 @@ class Entorno:
             aplicar_efecto(trampa, actor, self.reloj)
             trampa.armada = False
 
-        def rearmar(reloj):
-            reloj.registrar(DeltaTrampa(trampa))
-            trampa.rearmar()
+        rearmar = EjecutorEvento('rearme', trampa)
 
         self.reloj.programar_en(self.reloj.tiempo_actual + trampa.rearme,
                                 rearmar, tipo='rearme_trampa', dueno=trampa,
@@ -63,9 +62,7 @@ class Entorno:
         self.reloj.cancelar(salida.evento_cierre)
         salida.cerrada = False
         if intervalo is not None:
-            def cerrar(reloj):
-                reloj.registrar(DeltaPuerta(salida))
-                salida.cerrada = True
+            cerrar = EjecutorEvento('cierre', salida)
             self.reloj.programar_en(self.reloj.tiempo_actual + intervalo,
                                     cerrar, tipo='cierre_puerta', dueno=salida,
                                     campo='evento_cierre')

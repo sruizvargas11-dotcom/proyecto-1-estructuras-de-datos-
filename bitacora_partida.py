@@ -4,7 +4,7 @@ MARCA     = "CRIPTA_LOG v1"
 SEPARADOR = "----------"
 
 
-class ErrorVersionIncompatible(Exception):
+class ErrorVersionIncompatible(ValueError):
     pass
 
 
@@ -106,7 +106,11 @@ class BitacoraPartida:
                 if not linea:
                     continue
                 prefijo, _, accion = linea.partition(" ")
+                if not prefijo.startswith('t=') or not accion:
+                    raise ValueError('Línea inválida en la bitácora.')
                 tiempo = int(prefijo[len("t="):])
+                if tiempo < 0:
+                    raise ValueError('Tiempo negativo en la bitácora.')
                 acciones.append((tiempo, accion))
 
         return acciones
