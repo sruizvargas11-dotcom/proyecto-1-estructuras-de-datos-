@@ -5,6 +5,7 @@ Corre con pytest sobre carpetas temporales; no toca archivos del repositorio.
 
 import ast
 import os
+import random
 
 import pytest
 
@@ -252,6 +253,24 @@ class TestCargarSalaBinaria:
         partida = PartidaBinaria(ruta_binaria)
         partida.guardar(_estado_global_ejemplo(), _estado_salas_ejemplo())
 
+        assert partida.cargar_sala_binaria(999) is None
+
+    def test_busqueda_binaria_en_disco_con_200_salas_desordenadas(self, ruta_binaria):
+        """La búsqueda binaria ahora se hace directamente sobre el índice en
+        disco (sin cargarlo completo): se verifica que sigue encontrando la
+        sala correcta en los extremos y en el medio, con un índice grande y
+        guardado fuera de orden."""
+        rnd = random.Random(7)
+        ids = list(range(200))
+        rnd.shuffle(ids)
+        salas_desordenadas = [(sid, {"sala": sid}) for sid in ids]
+
+        partida = PartidaBinaria(ruta_binaria)
+        partida.guardar(_estado_global_ejemplo(), salas_desordenadas)
+
+        assert partida.cargar_sala_binaria(0) == {"sala": 0}
+        assert partida.cargar_sala_binaria(100) == {"sala": 100}
+        assert partida.cargar_sala_binaria(199) == {"sala": 199}
         assert partida.cargar_sala_binaria(999) is None
 
 
