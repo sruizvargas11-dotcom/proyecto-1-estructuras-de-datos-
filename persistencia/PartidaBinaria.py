@@ -3,7 +3,6 @@ import json, os
 
 from estructuras.vector_dinamico import Vector
 from estructuras.ordenamientos import ordenar
-from estructuras.array_ordenado import ArrayOrdenado
 
 # "CRPT" en bytes — sirve para reconocer el archivo como nuestro
 MAGIC           = 0x43525054
@@ -135,30 +134,41 @@ class PartidaBinaria:
 
     def cargar_sala_binaria(self, sala_id: int) -> dict | None:
         """
-        Carga una sala específica usando búsqueda binaria sobre el índice
-        (un ArrayOrdenado propio) y un único seek. No lee el archivo
-        completo.
+        Carga una sala específica con búsqueda binaria DIRECTAMENTE sobre el
+        índice en disco: cada paso es un seek + la lectura de una sola
+        entrada (8 bytes), nunca el índice completo. O(log n) lecturas,
+        más un último seek al bloque de la sala.
         """
         with open(self.ruta, "rb") as f:
             num_salas, _ = self._leer_encabezado(f)
+            off = self._buscar_offset_en_indice(f, num_salas, sala_id)
+            if off is None:
+                return None   # la sala no estaba guardada
 
-            # cargamos el índice en memoria (es pequeño, n × 8 bytes); el
-            # índice en disco ya está ordenado por sala_id, así que cada
-            # inserción cae al final del ArrayOrdenado (sin desplazamientos).
-            indice = ArrayOrdenado()
-            for _ in range(num_salas):
-                sid = _leer(f, 4)
-                off = _leer(f, 4)
-                indice.insertar(sid, off)
-
-        off = indice.busqueda_binaria(sala_id)   # O(log n)
-        if off is None:
-            return None   # la sala no estaba guardada
-
-        with open(self.ruta, "rb") as f:
             f.seek(off + 4)              # +4 para saltarnos el sala_id
             longitud = _leer(f, 4)
             return json.loads(f.read(longitud))
+
+    def _buscar_offset_en_indice(self, f, num_salas, sala_id):
+        """Búsqueda binaria sobre las entradas de 8 bytes del índice en
+        disco (arranca justo después del encabezado de 12 bytes)."""
+        inicio_indice = 12
+        inicio, fin = 0, num_salas - 1
+
+        while inicio <= fin:
+            medio = (inicio + fin) // 2
+            f.seek(inicio_indice + medio * 8)
+            sid = _leer(f, 4)
+            off = _leer(f, 4)
+
+            if sid == sala_id:
+                return off
+            if sid < sala_id:
+                inicio = medio + 1
+            else:
+                fin = medio - 1
+
+        return None
 
     def cargar_todo(self) -> tuple:
         """Carga estado global + todas las salas. Útil para pruebas.

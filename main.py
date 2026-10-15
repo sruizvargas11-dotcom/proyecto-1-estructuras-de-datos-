@@ -27,7 +27,13 @@ def main(argumentos=None):
                         help='Fichas de catálogo en memoria (LRU), por defecto 25')
     parser.add_argument('--hilos', action='store_true',
                         help='Precarga de salas en segundo plano')
+    parser.add_argument('--bench', action='store_true',
+                        help='ejecuta cargas sintéticas y reporta tiempos')
     opciones = parser.parse_args(argumentos)
+    if opciones.bench:
+        from bench.runner import main_bench
+        main_bench()
+        return 0
     try:
         fuente = crear_fuente(['--offline'] if opciones.offline else [])
         cripta_id = opciones.cripta
