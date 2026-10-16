@@ -1,7 +1,12 @@
 import os
 
+from estructuras.vector_dinamico import Vector
+
 MARCA     = "CRIPTA_LOG v1"
 SEPARADOR = "----------"
+CIERRE    = "fin"   # t=<tiempo> fin <estado>, seguida de las líneas del estado final
+ESTADO    = "= "    # prefijo de cada línea del estado final
+CAMPOS    = ("cripta_id", "version_cripta", "version_catalogo", "semilla")
 
 
 class ErrorVersionIncompatible(ValueError):
@@ -45,43 +50,39 @@ class BitacoraPartida:
             if primera != MARCA:
                 raise ValueError(f"El archivo no es una bitácora de CRIPTA.")
 
-            cripta_id = version_cripta = version_catalogo = semilla = None
+            # Tupla alineada con CAMPOS: cuatro claves fijas, sin diccionario.
+            valores = [None, None, None, None]
             for linea in f:
                 if linea.strip() == SEPARADOR:
                     break
                 if ":" in linea:
                     clave, _, valor = linea.partition(":")
-                    clave, valor = clave.strip(), valor.strip()
-                    if clave == "cripta_id":
-                        cripta_id = valor
-                    elif clave == "version_cripta":
-                        version_cripta = valor
-                    elif clave == "version_catalogo":
-                        version_catalogo = valor
-                    elif clave == "semilla":
-                        semilla = valor
+                    for i in range(len(CAMPOS)):
+                        if CAMPOS[i] == clave.strip():
+                            valores[i] = valor.strip()
 
-        for nombre_campo, valor_campo in (
-            ("cripta_id", cripta_id),
-            ("version_cripta", version_cripta),
-            ("version_catalogo", version_catalogo),
-            ("semilla", semilla),
-        ):
-            if valor_campo is None:
-                raise KeyError(nombre_campo)
-
+        for i in range(len(CAMPOS)):
+            if valores[i] is None:
+                raise ValueError(f"La bitácora no tiene el campo '{CAMPOS[i]}' en el encabezado.")
         return cls(
             ruta             = ruta,
-            cripta_id        = cripta_id,
-            version_cripta   = version_cripta,
-            version_catalogo = version_catalogo,
-            semilla          = int(semilla),
+            cripta_id        = valores[0],
+            version_cripta   = valores[1],
+            version_catalogo = valores[2],
+            semilla          = int(valores[3]),
         )
 
     def registrar(self, tiempo: int, accion: str):
         if self._archivo is None:
             self._archivo = open(self.ruta, "a", encoding="utf-8")
         self._archivo.write(f"t={tiempo} {accion}\n")
+        self._archivo.flush()
+
+    def registrar_cierre(self, tiempo: int, estado: str, lineas_estado):
+        """Línea 'fin' y debajo el estado final completo; el replay lo compara."""
+        self.registrar(tiempo, f"{CIERRE} {estado}")
+        for linea in lineas_estado:
+            self._archivo.write(f"{ESTADO}{linea}\n")
         self._archivo.flush()
 
     def cerrar(self):
@@ -103,17 +104,38 @@ class BitacoraPartida:
 
             for linea in f:
                 linea = linea.rstrip("\n")
-                if not linea:
+                if not linea or linea.startswith(ESTADO):
                     continue
-                prefijo, _, accion = linea.partition(" ")
-                if not prefijo.startswith('t=') or not accion:
-                    raise ValueError('Línea inválida en la bitácora.')
-                tiempo = int(prefijo[len("t="):])
-                if tiempo < 0:
-                    raise ValueError('Tiempo negativo en la bitácora.')
-                acciones.append((tiempo, accion))
+                tiempo, accion = self._partir(linea)
+                if accion.split(" ")[0] != CIERRE:
+                    acciones.append((tiempo, accion))
 
         return acciones
+
+    @staticmethod
+    def _partir(linea):
+        prefijo, _, accion = linea.partition(" ")
+        if not prefijo.startswith("t=") or not prefijo[2:].isdigit() or not accion:
+            raise ValueError(f"Línea de bitácora inválida: '{linea}'")
+        return int(prefijo[2:]), accion
+
+    def leer_cierre(self):
+        """(tiempo, estado, lineas_estado) del cierre, o None si la partida no se
+        cerró de forma controlada (por ejemplo, el programa se cayó)."""
+        cierre = None
+        with open(self.ruta, "r", encoding="utf-8") as f:
+            for linea in f:
+                linea = linea.rstrip("\n")
+                if cierre is not None and linea.startswith(ESTADO):
+                    cierre[2].agregarValor(linea[len(ESTADO):])
+                    continue
+                if not linea.startswith("t="):
+                    continue
+                tiempo, accion = self._partir(linea)
+                partes = accion.split(" ")
+                if partes[0] == CIERRE and len(partes) >= 2:
+                    cierre = (tiempo, partes[1], Vector())
+        return cierre
 
     def verificar_compatibilidad(self, version_cripta, version_catalogo):
         problemas = []

@@ -1,3 +1,5 @@
+from controlador.estado_final import lineas_estado
+from controlador.narrador_eventos import describir_evento
 from estructuras.vector_dinamico import Vector
 from modelo.entidades.enemigo import Enemigo
 from modelo.entidades.objetos.arma import Arma
@@ -147,11 +149,13 @@ class ControladorJuego:
 
     def jugar(self):
         """Bucle principal: ciclos de 4 pasos mientras la partida siga activa."""
+        completa = False
         try:
             while not self.partida.terminada and not self._salir:
                 self.ciclo()
+            completa = True
         finally:
-            self._cerrar()
+            self._cerrar(completa)
         return self.partida.estado
 
     def ciclo(self):
@@ -187,7 +191,11 @@ class ControladorJuego:
             # si es recurrente, se reprograma solo.
             self.contador_efectos += 1
             self.reloj.extraer_siguiente()
+            vida_antes = getattr(evento.dueno, "vida", None)
             self.reloj.ejecutar_evento(entrada)
+            texto = describir_evento(self.partida, evento, vida_antes)
+            if texto is not None:
+                self.vista.agregar_mensaje(self.reloj.tiempo_actual, texto)
             self.partida.verificar_fin()
 
         # 4. Programar la siguiente acción
@@ -498,10 +506,13 @@ class ControladorJuego:
         except (OSError, ValueError, RuntimeError) as error:
             self._rechazar(f'No se pudo {comando.nombre}: {error}')
 
-    def _cerrar(self):
+    def _cerrar(self, completa=True):
         """Fin de sesión: cierra el intervalo abierto, la bitácora y la red."""
         if self.historial.registrando:
             self.historial.confirmar_accion()
+        if self.bitacora is not None and completa:
+            self.bitacora.registrar_cierre(self.partida.tiempo, self.partida.estado,
+                                           lineas_estado(self.partida))
         if self.bitacora is not None:
             self.bitacora.cerrar()
         self.red.cerrar(5)

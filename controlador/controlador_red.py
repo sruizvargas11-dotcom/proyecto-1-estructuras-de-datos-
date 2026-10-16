@@ -219,7 +219,9 @@ class ControladorRed:
         self.contador_solicitudes_contenido = 0
         self.contador_solicitudes_catalogo = 0
         self.contador_salas_desde_disco = 0
+        self.contador_salas_desde_red = 0
         self.contador_fichas_desde_disco = 0
+        self.contador_fichas_desde_red = 0
         self.contador_precargas_fallidas = 0
         self.contador_esperas_bloqueantes = 0
 
@@ -287,10 +289,22 @@ class ControladorRed:
             ("solicitudes_contenido", self.contador_solicitudes_contenido),
             ("solicitudes_catalogo", self.contador_solicitudes_catalogo),
             ("salas_desde_disco", self.contador_salas_desde_disco),
+            ("salas_desde_red", self.contador_salas_desde_red),
             ("fichas_desde_disco", self.contador_fichas_desde_disco),
+            ("fichas_desde_red", self.contador_fichas_desde_red),
             ("precargas_fallidas", self.contador_precargas_fallidas),
             ("esperas_bloqueantes", self.contador_esperas_bloqueantes),
         ) + self._buffer.contadores()
+
+    def estadisticas_cache(self):
+        """Cifras de la LRU de fichas para el reporte de red (no alteran su orden)."""
+        lru = self._fichas
+        return (("aciertos", lru.contador_aciertos),
+                ("fallos", lru.contador_fallos),
+                ("desalojos", lru.contador_desalojos),
+                ("capacidad", lru._capacidad),
+                ("en_memoria", len(lru)),
+                ("salas_incorporadas", len(self._incorporadas)))
 
     def cerrar(self, tiempo_maximo=None):
         """Espera los hilos de red pendientes (al terminar la sesión)."""
@@ -479,6 +493,7 @@ class ControladorRed:
             self._anotar_catalogo(lote)
             respuesta = self._fuente.catalogo(lote)
             self.contador_solicitudes_catalogo += 1
+            self.contador_fichas_desde_red += len(lote)
             for tipo_id in lote:
                 ficha = self._buscar_ficha_en_respuesta(respuesta, tipo_id)
                 pers.guardar_ficha(tipo_id, ficha)
@@ -551,6 +566,7 @@ class ControladorRed:
         for indice, (sala_id, datos) in enumerate(datos_lote):
             if datos is None:
                 datos_lote.asignarValor(indice, (sala_id, self._buscar_en_respuesta(respuesta, sala_id)))
+                self.contador_salas_desde_red += 1
             else:
                 self.contador_salas_desde_disco += 1
 

@@ -136,7 +136,13 @@ def cargar(ruta, sesion_actual):
         partida._resolver_ficha = _resolvedor_fichas(red)
         partida.aplicar_efecto = efectos.aplicar_efecto_objeto
         partida.al_morir_enemigo.agregarValor(red.notificar_muerte_enemigo)
-        sesion = SesionPartida(partida, red, sesion_actual.fuente)
+        for campo, valor in vars(sesion_actual.red).items():
+            if campo.startswith('contador_'):
+                setattr(red, campo, valor)
+        for campo in ('contador_aciertos', 'contador_fallos', 'contador_desalojos'):
+            setattr(red._fichas, campo, getattr(sesion_actual.red._fichas, campo))
+        sesion = SesionPartida(partida, red, sesion_actual.fuente,
+                               esqueleto_desde_cache=sesion_actual.esqueleto_desde_cache)
         sesion.acciones = estado['acciones']
         sesion.protegidas = estado['protegidas']
         sesion.mensajes_guardados = estado.get('mensajes')
