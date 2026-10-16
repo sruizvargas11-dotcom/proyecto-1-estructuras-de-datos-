@@ -1,10 +1,7 @@
-"""Integración extremo a extremo: Partida real (nueva_partida) conectada con
-los efectos reales de rol 2, no solo efectos.py en aislamiento.
+"""Pruebas de efectos a través de una partida inicializada con nueva_partida.
 
-Confirma que el hook que dejó ROL 4 (Partida.aplicar_efecto, asignado en
-controlador/inicio_partida.py) efectivamente dispara aplicar_efecto_objeto
-cuando el jugador usa una poción con modificador de velocidad, un antídoto
-o una antorcha, con datos reales del catálogo offline donde existen.
+Verifican la conexión de Partida.aplicar_efecto con las pociones de
+velocidad, los antídotos y las antorchas.
 """
 from adaptadores.datos_offline import DatosOffline
 from controlador.inicio_partida import nueva_partida
@@ -29,7 +26,7 @@ def test_aplicar_efecto_queda_conectado_al_arrancar_la_partida(tmp_path):
 
 
 def test_usar_antorcha_real_la_enciende_y_se_apaga_sola(tmp_path):
-    """sala_1 (inicial de cripta-01) trae itm_antorcha de verdad."""
+    """Usa la antorcha incluida en la sala inicial de cripta-01."""
     sesion = _sesion(tmp_path)
     partida = sesion.partida
     jugador = partida.jugador
@@ -72,9 +69,11 @@ def test_usar_antidoto_real_cancela_el_veneno_activo(tmp_path):
 
 
 def test_usar_pocion_con_modificador_de_velocidad_la_cambia_y_restaura(tmp_path):
-    """No hay poción de velocidad en el catálogo offline todavía: se construye
-    una ficha de prueba, igual que cualquier otra clase ya validada por
-    FabricaObjetos (Sec. 4.3). Esto no inventa reglas, solo prueba el cableado."""
+    """Crea una ficha de poción de velocidad para probar su integración.
+
+    El catálogo offline no incluye una poción de ese tipo, así que la prueba
+    la construye con los campos que acepta FabricaObjetos.
+    """
     sesion = _sesion(tmp_path)
     partida = sesion.partida
     jugador = partida.jugador

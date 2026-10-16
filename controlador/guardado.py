@@ -21,7 +21,7 @@ def _comparar_registros(a, b):
 
 
 def _datos_entidad(entidad):
-    """Proyección legible de una sala, sin seguir referencias al resto del mundo."""
+    """Datos de una entidad y sus eventos, sin recorrer el resto del mundo."""
     datos = {k: v for k, v in vars(entidad).items()
              if v is None or type(v) in (str, int, float, bool)}
     for campo in ('evento_actual', 'evento_veneno', 'evento_mod_velocidad',
@@ -94,7 +94,7 @@ def guardar(sesion, ruta, protegidas=None, mensajes=None):
 
 
 def cargar(ruta, sesion_actual):
-    """Prepara una sesión independiente; el llamador la intercambia al validar."""
+    """Construye y valida una sesión nueva antes de sustituir la sesión en curso."""
     try:
         archivo = PartidaBinaria(ruta)
         datos = archivo.cargar_global()

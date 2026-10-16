@@ -1,23 +1,42 @@
 4.5 - INVENTARIO
-(Redacta ROL 2, Revisa ROL 3)
-
-Borrador técnico B2, 11-10-2026. Revisión automatizada ejecutada; revisión humana del rol indicado pendiente.
+Redacta: rol 2. Revisa: rol 3.
+Cierre del bloque 4: 16 de octubre de 2026. Pendiente de revisión por el rol 3.
 
 1 - PROBLEMA
-Recoger, seleccionar, equipar y soltar objetos conservando una selección válida y el límite recibido de la fuente.
+El inventario debe permitir recoger, seleccionar, equipar y soltar objetos sin perder la posición del cursor. También debe respetar la capacidad que indican los datos de la cripta y mantener los objetos en un estado coherente cuando una acción se rechaza o se revierte.
+
+En la ruta de ensayo con semilla 3, que termina en victoria, se registraron 5 inserciones, 1 eliminación, 1 movimiento al frente y 48 recorridos desde el frente, con un total de 104 nodos recorridos. Estos contadores reflejan el trabajo realizado por la estructura, incluso si después se deshace una acción. Por eso, no representan la cantidad de objetos que queda en el inventario al terminar.
 
 2 - ALTERNATIVAS
-Vector: acceso por índice rápido, pero borrar un objeto intermedio desplaza elementos. Lista simple: eliminar necesita conocer el anterior y retroceder no es directo. Lista doble: permite navegar ambos sentidos y eliminar el nodo seleccionado sin buscarlo.
+Un Vector o una list de Python almacena los elementos de forma contigua, pero al eliminar el primero necesita desplazar los siguientes. Una lista simple evita ese desplazamiento, aunque retroceder desde el cursor requiere buscar el nodo anterior. La lista doble permite avanzar y retroceder, y también eliminar directamente un nodo cuando ya se tiene su referencia.
+
+En los tamaños medidos, la list de Python fue más rápida que nuestra ListaDoble. Aun así, mantuvimos la lista doble porque permite trabajar con referencias a nodos y con un cursor bidireccional, además de cumplir el requisito del proyecto de implementar las estructuras propias.
 
 3 - DECISIÓN
-Jugador mantiene ListaDoble y cursor al nodo. soltar_actual delega en soltar_nodo; equipar mueve el nodo al frente. La vista ordenada se construye en un Vector separado y no reordena el inventario real. Recoger lleno devuelve False antes de retirar el objeto del suelo. Aplicar costos de tiempo pertenece al controlador del B3.
+El jugador mantiene su inventario en una ListaDoble con cursor. Al equipar un objeto, su nodo se mueve al frente. Para mostrar una vista ordenada por peso, valor o nombre, se crea un Vector separado; así se conserva el orden real del inventario.
 
-4 - COMPLEJIDAD ALGORÍTMICA
-Avanzar/retroceder cursor, soltar nodo conocido y equipar nodo: O(1). Buscar por instancia: O(n). Recoger incluye búsqueda de duplicados y retirada del suelo: O(n+s), donde s es objetos del suelo. Copiar vista: O(n); ordenar depende del algoritmo elegido. Espacio del inventario O(n).
+Si el inventario está lleno, la acción de recoger se rechaza antes de retirar el objeto del suelo y sin consumir tiempo virtual. Este comportamiento se comprobó también desde ControladorJuego, para verificar la integración con el bucle de la partida.
+
+4 - COMPLEJIDAD
+Cuando ya se conoce el nodo, avanzar o retroceder el cursor, eliminar el objeto y moverlo al frente cuestan O(1). Si primero hay que buscar el objeto por su id, esa búsqueda cuesta O(n), donde n es la cantidad de objetos del inventario.
+
+Recoger un objeto incluye buscar duplicados en el inventario y retirarlo del suelo, por lo que cuesta O(n+s), donde s es la cantidad de objetos en el suelo. Crear la copia que se usa para una vista ordenada cuesta O(n), a lo que se suma el costo del algoritmo de ordenamiento elegido.
 
 5 - EVIDENCIA
-tests/test_bloque2_entidades.py y tests/test_contadores_estructuras.py verifican cursor, pertenencia de nodos, equipo, capacidad, transferencia de objetos y estructuras. La suite completa tiene 345 pruebas aprobadas.
-Tabla comparativa --bench para 10, 50 y 500 objetos: pendiente. Se medirán repeticiones, mediana y equipo; no se deduce velocidad real solo de O(1).
+Las frecuencias de uso, la ruta de ensayo y su configuración se encuentran en docs/evidencia/2026-10-16-determinismo.json. La comparación de estructuras está en docs/evidencia/2026-10-16-catalogo-inventario.json.
+
+El benchmark agrega n objetos y después los elimina desde el inicio, para un total de 2n operaciones. Se realizó un calentamiento y se tomó la mediana de 5 repeticiones en Windows 11, con Python 3.12.14 y un procesador identificado como AMD64 Family 25 Model 33 Stepping 2. La tabla muestra el tiempo total de cada ensayo en milisegundos:
+
+n | ListaDoble | list
+10 | 0.005600 | 0.000800
+50 | 0.023400 | 0.002900
+500 | 0.251200 | 0.035700
+
+La prueba test_recoger_con_inventario_lleno_se_rechaza_sin_tiempo comprueba el rechazo cuando no hay espacio. Por su parte, test_recorrer_ordenar_no_reordena_y_numero_sigue_siendo_real verifica que las vistas ordenadas conserven el orden y la numeración del inventario real. Las pruebas de entidades y del cursor cubren las operaciones de navegación y modificación.
+
+La comparación de rendimiento se puede repetir con python main.py --bench.
 
 6 - LÍMITES
-El beneficio O(1) exige referencia al nodo. soltar(id) primero busca O(n). Cada nodo agrega referencias anterior/siguiente. Costos virtuales y rechazo sin avanzar reloj deben integrarse y probarse con el motor en B3.
+La eliminación en O(1) depende de tener la referencia al nodo. Si solo se dispone del id del objeto, primero hay que recorrer la lista. Además, cada nodo necesita guardar las referencias al anterior y al siguiente, lo que añade un costo de memoria.
+
+Hasta 500 objetos, el benchmark no muestra una ventaja de tiempo frente a list. Tampoco mide todas las operaciones posibles del cursor. Estos resultados describen el ensayo de inventario y no permiten sacar conclusiones sobre una cripta con x10 o x50 salas; esa medición completa corresponde al trabajo de rendimiento del rol 3.

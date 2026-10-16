@@ -1,11 +1,7 @@
-"""Guardado/carga (§4.10): PartidaBinaria vs JSON, tamaño y tiempo de carga.
+"""Compara tamaño y tiempos del guardado binario frente a JSON.
 
-bench/bench_bloque3.py ya mide exactamente esto con la API real de
-PartidaBinaria (guardar/cargar_todo/cargar_sala_binaria) y es importable sin
-efectos secundarios (solo define funciones; su main() queda detrás de
-`if __name__ == "__main__"`). Se reutiliza bench_tamano() en vez de volver a
-escribir esas llamadas; ya acepta num_salas, así que basta llamarla una vez
-por tamaño (internamente elige su propia sala intermedia de ese tamaño).
+Reutiliza bench_tamano de bench_bloque3 para medir escritura, lectura
+completa y consulta de una sala en distintos tamaños de partida.
 """
 import tempfile
 from bench.bench_bloque3 import bench_tamano

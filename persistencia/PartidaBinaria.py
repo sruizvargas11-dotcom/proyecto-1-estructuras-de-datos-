@@ -1,4 +1,4 @@
-# persistencia/partida_binaria.py
+# Formato binario con índice por sala y bloques de datos JSON.
 import json, os
 
 from estructuras.vector_dinamico import Vector
@@ -145,11 +145,10 @@ class PartidaBinaria:
             return _leer_json(f, longitud)
 
     def cargar_sala_binaria(self, sala_id: int) -> dict | None:
-        """
-        Carga una sala específica con búsqueda binaria DIRECTAMENTE sobre el
-        índice en disco: cada paso es un seek + la lectura de una sola
-        entrada (8 bytes), nunca el índice completo. O(log n) lecturas,
-        más un último seek al bloque de la sala.
+        """Busca una sala directamente en el índice del archivo.
+
+        Cada paso lee una entrada de 8 bytes. La búsqueda necesita O(log n)
+        lecturas del índice y después un desplazamiento al bloque de la sala.
         """
         with open(self.ruta, "rb") as f:
             num_salas, inicio_datos = self._leer_encabezado(f)

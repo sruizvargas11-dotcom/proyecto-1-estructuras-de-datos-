@@ -1,22 +1,13 @@
-"""Efectos temporales reales.
+"""Efectos temporales programados en el reloj de la partida.
 
-Construye sobre Reloj.programar_en/cancelar y los deltas existentes; no copia
-la partida ni mantiene su propio registro paralelo de reversión. Cada función
-es un primitivo reutilizable: no decide QUIÉN aplica un veneno ni con qué
-daño, eso lo conecta quien tenga la ficha concreta (una trampa mediante el
-`aplicar_efecto` de Entorno, el ataque de un enemigo, una poción). Así se
-respeta la instrucción de ROL3_BLOQUE3.md de no inventar esas reglas al
-conectar callbacks.
+Los cambios se registran mediante los deltas del historial compartido.
+El objeto o la entidad que aplica un efecto aporta sus parámetros, como
+el daño del veneno o la duración de una antorcha.
 
-Políticas abiertas que SÍ quedan fijadas aquí (documentadas en
-docs/decisiones/4.06.txt, pendiente de revisión del equipo):
-
-- Reaplicar veneno mientras ya está activo reinicia el conteo de pulsos
-  completo con el nuevo daño (no se suman ni se promedian duraciones).
-- El pulso que cae exactamente en t+400 SÍ se ejecuta: con intervalo 80 y
-  duración 400 hay 5 pulsos (80, 160, 240, 320, 400); el límite es inclusivo.
-- Un antídoto antes del próximo pulso cancela esa agenda; el pulso ya no
-  ocurre porque la entrada del heap queda inválida antes de ejecutarse.
+El veneno reinicia sus pulsos al aplicarse de nuevo. Con intervalo 80 y
+duración 400 se ejecutan cinco pulsos, incluido el del instante 400.
+Un antídoto cancela las entradas pendientes antes del siguiente pulso.
+Estas reglas están documentadas en docs/decisiones/4.06.txt.
 """
 from modelo.deltas import DeltaAtributos
 from modelo.reloj import entero
@@ -81,9 +72,10 @@ def cancelar_veneno(reloj, actor):
 # ---------------------------------------------------------------------------
 
 def aplicar_modificador_velocidad(reloj, actor, modificador, duracion):
-    """Aplica un modificador de velocidad temporal (Sec. 2.3 y 2.10): el
-    inicio Y el fin reajustan la próxima acción mediante
-    reprogramar_por_velocidad, nunca una asignación directa.
+    """Aplica un cambio temporal de velocidad.
+
+    Tanto al comenzar como al terminar, reprograma la próxima acción
+    para conservar el progreso del turno.
     """
     entero(duracion, 'duración del modificador', 1)
     if not actor.vivo:
@@ -161,9 +153,10 @@ def _programar_pulso_regeneracion(reloj, enemigo):
 # ---------------------------------------------------------------------------
 
 def aplicar_efecto_objeto(partida, objeto):
-    """Implementación real del hook que Partida.usar_objeto ya deja listo
-    para rol 2. Partida decide CUÁNDO llamarlo (poción con modificador de
-    velocidad, antídoto, antorcha); acá se decide QUÉ hace cada clase.
+    """Aplica el efecto del objeto que Partida.usar_objeto acaba de validar.
+
+    Resuelve pociones de velocidad, antídotos y antorchas; Partida se encarga
+    de decidir cuándo usar el objeto y de consumirlo si corresponde.
     """
     reloj, jugador = partida.reloj, partida.jugador
     if objeto.clase == 'pocion':

@@ -1,7 +1,8 @@
-"""
-Heap mínimo (cola de prioridad) sobre el vector propio. Ordena por (tiempo, secuencia) para el desempate.
-Usa eliminación diferida ('lazy deletion'): cancelar un evento no lo busca ni lo saca del medio del heap,
-simplemente lo marca inválido y se descarta sólo cuando llega a la raíz. Leer la documentación de este método acá: https://realpython.com/python-lazy-evaluation/
+"""Agenda de prioridad ordenada por tiempo y secuencia de inserción.
+
+La secuencia resuelve los empates entre eventos del mismo instante.
+Cancelar una entrada la marca como inválida; se retira del heap cuando
+llega a la raíz, sin buscarla entre las demás entradas.
 """
 
 from estructuras.vector_dinamico import Vector
@@ -109,9 +110,9 @@ class HeapMinimo:
         return nueva
 
     def extraer_minimo(self):
-        """
-        O((k + 1) log n) si descarta k entradas canceladas. Puede devolver None por dos motivos: el heap está realmente vacio, o solo quedaban entradas canceladas, que se
-        descartan automáticamente en el camino.
+        """Extrae el dato del próximo evento válido, o None si no queda ninguno.
+
+        Si antes debe retirar k entradas canceladas, cuesta O((k + 1) log n).
         """
 
         entrada = self.extraer_entrada()

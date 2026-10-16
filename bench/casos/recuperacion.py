@@ -9,7 +9,7 @@ from bench.medicion import Fila, medir
 
 FICHAS = 25
 CAPACIDAD_MEMORIA = FICHAS   # entran todas: nunca hay que desalojar
-CAPACIDAD_DISCO = 10         # capacidad chica: fuerza desalojo hacia disco
+CAPACIDAD_DISCO = 10         # Una caché pequeña obliga a recuperar del disco las fichas desalojadas.
 
 
 def _fichas_sinteticas():

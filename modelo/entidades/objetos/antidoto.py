@@ -1,4 +1,4 @@
-"""Objeto consumible que permitirá cancelar el veneno activo."""
+"""Consumible que cancela el veneno activo."""
 
 from modelo.entidades.objetos.objeto import Objeto
 

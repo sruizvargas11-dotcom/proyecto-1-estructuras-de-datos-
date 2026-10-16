@@ -1,4 +1,4 @@
-"""Pruebas humo del modo --bench."""
+"""Comprobaciones básicas de los casos y resultados de --bench."""
 import ast
 import glob
 

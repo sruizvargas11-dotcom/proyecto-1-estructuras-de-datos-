@@ -1,24 +1,24 @@
-"""
-Ordenamiento con seleccion automatica entre InsertionSort y MergeSort,
-segun tamano y grado de desorden medidos.
+"""Selecciona entre InsertionSort y MergeSort para ordenar un Vector.
 
-Ambos reciben un 'comparar(a, b)' que devuelve negativo si a < b, cero
-si son iguales, positivo si a > b - asi sirven tanto para ordenar la
-tabla de puntajes como las vistas del inventario (por peso, valor o
-nombre), sin duplicar codigo por cada criterio.
+El comparador devuelve un valor negativo si a < b, cero si son equivalentes
+y uno positivo si a > b. Esto permite reutilizar los algoritmos con distintos
+criterios, como el peso, el valor o el nombre de los objetos.
 """
 
 from estructuras.vector_dinamico import Vector
 
-UMBRAL_TAMANO_PEQUENO = 30       # se ajusta con --bench
-# El umbral de tamaño es provisional hasta calibrarlo con --bench.
-# Pocos descensos adyacentes NO garantizan pocas inversiones: dos bloques
-# ordenados en orden inverso pueden requerir O(n^2) movimientos en Insertion.
+UMBRAL_TAMANO_PEQUENO = 50
+# Medido con las funciones reales y Vector: docs/decisiones/4.09.txt.
+# Cruce aleatorio claro desde n=60; n=50 queda dentro del margen del 10%.
+# Dos bloques ordenados pero colocados en orden inverso pueden tener pocos
+# descensos entre vecinos y aun así exigir O(n²) movimientos a InsertionSort.
 
 
 def insertion_sort(vector, comparar):
-    """In-place, O(n^2) en el peor caso, O(n + I), donde I es la cantidad de inversiones - por eso es la mejor opcion para listas pequenas
-    o con pocos elementos fuera de lugar."""
+    """Ordena sobre el mismo Vector en O(n + I), donde I es el número de inversiones.
+
+    Con datos ordenados cuesta O(n); en el peor caso llega a O(n²).
+    """
     for i in range(1, len(vector)):
         actual = vector.obtenerValor(i)
         j = i - 1
@@ -29,8 +29,7 @@ def insertion_sort(vector, comparar):
 
 
 def merge_sort(vector, comparar):
-    """O(n log n) garantizado, sin importar el orden de entrada.
-    Necesita un Vector auxiliar del mismo tamano para la mezcla."""
+    """Ordena en O(n log n), con vectores auxiliares para mezclar cada rango."""
     if len(vector) <= 1:
         return
     _merge_sort_rango(vector, 0, len(vector) - 1, comparar)
@@ -77,8 +76,11 @@ def _mezclar(vector, inicio, medio, fin, comparar):
 
 
 def contar_desorden_local(vector, comparar):
-    """Barrido O(n): cuenta pares ADYACENTES fuera de orden, sin medir
-    inversiones completas (eso seria O(n^2) y arruinaria la ganancia)."""
+    """Cuenta en O(n) los pares vecinos que están fuera de orden.
+
+    Este conteo permite detectar una entrada ya ordenada, pero no mide
+    el total de inversiones.
+    """
     desorden = 0
     for i in range(len(vector) - 1):
         if comparar(vector.obtenerValor(i), vector.obtenerValor(i + 1)) > 0:
@@ -87,7 +89,7 @@ def contar_desorden_local(vector, comparar):
 
 
 def elegir_algoritmo(vector, comparar, comparacion_costosa=False):
-    """Decide cual algoritmo usar segun tamano y desorden medidos. Los umbrales se calibran corriendo --bench."""
+    """Elige según el tamaño, el orden de entrada y el costo del comparador."""
     n = len(vector)
 
     if n <= UMBRAL_TAMANO_PEQUENO and not comparacion_costosa:

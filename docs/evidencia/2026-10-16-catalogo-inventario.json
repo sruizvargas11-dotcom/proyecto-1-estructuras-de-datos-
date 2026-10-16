@@ -1,0 +1,64 @@
+{
+  "python": "3.12.14",
+  "sistema": "Windows-11-10.0.26300-SP0",
+  "procesador": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+  "repeticiones": 5,
+  "filas": [
+    {
+      "caso": "cache",
+      "variante": "ListaLRU",
+      "n": 1000,
+      "ms": 3.45490000108839,
+      "extra": "aciertos=617"
+    },
+    {
+      "caso": "cache",
+      "variante": "lista_plana",
+      "n": 1000,
+      "ms": 0.4203000007692026,
+      "extra": "aciertos=960"
+    },
+    {
+      "caso": "inventario",
+      "variante": "ListaDoble",
+      "n": 10,
+      "ms": 0.005599998985417187,
+      "extra": ""
+    },
+    {
+      "caso": "inventario",
+      "variante": "list",
+      "n": 10,
+      "ms": 0.0008000006346264854,
+      "extra": ""
+    },
+    {
+      "caso": "inventario",
+      "variante": "ListaDoble",
+      "n": 50,
+      "ms": 0.023399999918183312,
+      "extra": ""
+    },
+    {
+      "caso": "inventario",
+      "variante": "list",
+      "n": 50,
+      "ms": 0.0029000002541579306,
+      "extra": ""
+    },
+    {
+      "caso": "inventario",
+      "variante": "ListaDoble",
+      "n": 500,
+      "ms": 0.25120000100287143,
+      "extra": ""
+    },
+    {
+      "caso": "inventario",
+      "variante": "list",
+      "n": 500,
+      "ms": 0.03569999898900278,
+      "extra": ""
+    }
+  ]
+}

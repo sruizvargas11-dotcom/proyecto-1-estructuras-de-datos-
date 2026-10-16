@@ -128,7 +128,7 @@ def test_pulso_recurrente_y_cancelacion_reversible_sin_duplicados():
     h.iniciar_accion(r)
     r.avanzar_y_ejecutar(160)
     futuro = r.proximo()
-    r.cancelar(futuro)  # Simula la cancelación del antídoto por rol 2.
+    r.cancelar(futuro)  # Cancela el veneno como lo haría un antídoto.
     r.proximo()        # fuerza descarte físico
     h.confirmar_accion()
     h.revertir()
@@ -353,7 +353,7 @@ def test_movimiento_enemigo_restaura_listas_y_referencia_sala():
 @pytest.mark.parametrize('semilla', [0,1,7,53,999])
 def test_cinco_intervalos_mixtos_restauran_cada_estado(semilla):
     h,r,j,sala = sistema()
-    r.azar.seed(semilla)  # Solo prueba: el juego recibe la semilla del rol 1.
+    r.azar.seed(semilla)  # La semilla se fija aquí para repetir exactamente el escenario de prueba.
     f = FabricaObjetos()
     for _ in range(5):
         sala.objetos_suelo.insertar_al_final(objeto(f))

@@ -10,14 +10,12 @@ from modelo.entidades.objetos.pergamino_retroceso import PergaminoRetroceso
 
 
 class FabricaObjetos:
-    """
-    Debe existir una sola fábrica por ORIGEN de objetos en cada partida.
+    """Asigna identificadores distintos al contenido de salas y al botín.
 
-    siguiente_id identifica la próxima instancia que se creará. El prefijo separa
-    los orígenes: el contenido de las salas usa "objeto" (sus ids dependen solo del
-    orden de número de las solicitudes de red) y el botín de los enemigos usa
-    "botin" (sus ids dependen solo de las acciones). Así ninguno depende de cuándo
-    llega una respuesta y los ids son únicos entre ambos.
+    Cada origen usa su propia fábrica y un prefijo: objeto para las salas
+    y botin para los enemigos. El contador de contenido sigue el orden de
+    las solicitudes; el de botín, el de las acciones del jugador. Así los
+    identificadores no dependen de la llegada de respuestas de red.
     """
 
     def __init__(self, siguiente_id=1, prefijo="objeto"):
