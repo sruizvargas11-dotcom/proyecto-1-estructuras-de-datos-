@@ -15,7 +15,16 @@ def _escribir(f, numero, n_bytes):
 
 def _leer(f, n_bytes):
     # lee n_bytes y los interpreta como entero big-endian
-    return int.from_bytes(f.read(n_bytes), byteorder="big")
+    datos = f.read(n_bytes)
+    if len(datos) != n_bytes:
+        raise ErrorFormatoBinario('Archivo binario truncado.')
+    return int.from_bytes(datos, byteorder="big")
+
+
+def _leer_json(f, longitud):
+    if longitud > os.fstat(f.fileno()).st_size - f.tell():
+        raise ErrorFormatoBinario('Longitud fuera del archivo.')
+    return json.loads(f.read(longitud))
 
 def _comparar_pares(a, b):
     """Compara pares (sala_id, datos) por sala_id, para ordenar() propio."""
@@ -122,7 +131,10 @@ class PartidaBinaria:
                 f"Versión del archivo ({version}) no compatible "
                 f"con esta versión del programa ({VERSION_FORMATO})."
             )
-        return _leer(f, 2), _leer(f, 4)   # num_salas, inicio_datos
+        num_salas, inicio_datos = _leer(f, 2), _leer(f, 4)
+        if not 12 + 8 * num_salas + 4 <= inicio_datos <= os.fstat(f.fileno()).st_size:
+            raise ErrorFormatoBinario('Índice o inicio de datos inválido.')
+        return num_salas, inicio_datos
 
     def cargar_global(self) -> dict:
         """Lee solo el estado global; no toca los bloques de sala."""
@@ -130,7 +142,7 @@ class PartidaBinaria:
             num_salas, _ = self._leer_encabezado(f)
             f.seek(12 + num_salas * 8)   # saltamos el índice entero
             longitud = _leer(f, 4)
-            return json.loads(f.read(longitud))
+            return _leer_json(f, longitud)
 
     def cargar_sala_binaria(self, sala_id: int) -> dict | None:
         """
@@ -140,14 +152,18 @@ class PartidaBinaria:
         más un último seek al bloque de la sala.
         """
         with open(self.ruta, "rb") as f:
-            num_salas, _ = self._leer_encabezado(f)
+            num_salas, inicio_datos = self._leer_encabezado(f)
             off = self._buscar_offset_en_indice(f, num_salas, sala_id)
             if off is None:
                 return None   # la sala no estaba guardada
 
-            f.seek(off + 4)              # +4 para saltarnos el sala_id
+            if not inicio_datos <= off <= os.fstat(f.fileno()).st_size - 8:
+                raise ErrorFormatoBinario('Offset de sala fuera del archivo.')
+            f.seek(off)
+            if _leer(f, 4) != sala_id:
+                raise ErrorFormatoBinario('El índice apunta a otra sala.')
             longitud = _leer(f, 4)
-            return json.loads(f.read(longitud))
+            return _leer_json(f, longitud)
 
     def _buscar_offset_en_indice(self, f, num_salas, sala_id):
         """Búsqueda binaria sobre las entradas de 8 bytes del índice en
@@ -183,13 +199,13 @@ class PartidaBinaria:
                 f.read(8)   # saltamos el índice
 
             longitud      = _leer(f, 4)
-            estado_global = json.loads(f.read(longitud))
+            estado_global = _leer_json(f, longitud)
 
             salas = []
             for _ in range(num_salas):
                 sid      = _leer(f, 4)
                 longitud = _leer(f, 4)
-                datos    = json.loads(f.read(longitud))
+                datos    = _leer_json(f, longitud)
                 salas.append((sid, datos))
 
         return estado_global, salas

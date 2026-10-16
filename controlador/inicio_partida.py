@@ -1,4 +1,5 @@
 import os
+from estructuras.vector_dinamico import Vector
 
 from bitacora_partida import BitacoraPartida
 from controlador.controlador_red import ControladorRed, cargar_cripta, _generales
@@ -17,6 +18,7 @@ class SesionPartida:
         self.red = red
         self.fuente = fuente
         self.bitacora = bitacora
+        self.acciones = Vector()
 
 
 def ruta_bitacora_por_defecto(cripta_id, semilla, carpeta=None):

@@ -20,6 +20,7 @@ docs/decisiones/4.06.txt, pendiente de revisión del equipo):
 """
 from modelo.deltas import DeltaAtributos
 from modelo.reloj import entero
+from modelo.ejecutor_evento import EjecutorEvento
 
 INTERVALO_VENENO = 80
 DURACION_VENENO = 400
@@ -60,18 +61,7 @@ def aplicar_veneno(reloj, actor, dano_por_pulso, pulsos=PULSOS_VENENO,
 def _programar_pulso_veneno(reloj, actor, intervalo):
     tiempo = reloj.tiempo_actual + intervalo
 
-    def pulso(reloj):
-        estado = actor.estado_veneno
-        if estado is None or not actor.vivo:
-            return
-        restantes = estado.pulsos_restantes - 1
-        reloj.registrar(DeltaAtributos(actor, 'estado_veneno'))
-        actor.estado_veneno = (
-            EstadoVeneno(estado.dano_por_pulso, restantes) if restantes > 0 else None
-        )
-        actor.recibir_dano(estado.dano_por_pulso)
-        if restantes > 0 and actor.vivo:
-            _programar_pulso_veneno(reloj, actor, intervalo)
+    pulso = EjecutorEvento('veneno', actor, intervalo)
 
     reloj.programar_en(tiempo, pulso, tipo='veneno', dueno=actor,
                         campo='evento_veneno', efecto=True)
@@ -111,9 +101,7 @@ def aplicar_modificador_velocidad(reloj, actor, modificador, duracion):
 
     tiempo = reloj.tiempo_actual + duracion
 
-    def fin(reloj):
-        if actor.vivo:
-            reloj.reprogramar_por_velocidad(actor, velocidad_original)
+    fin = EjecutorEvento('velocidad', actor, velocidad_original)
 
     reloj.programar_en(tiempo, fin, tipo='fin_modificador_velocidad', dueno=actor,
                         campo='evento_mod_velocidad', efecto=True)
@@ -132,9 +120,7 @@ def encender_antorcha(reloj, antorcha):
 
     tiempo = reloj.tiempo_actual + antorcha.duracion
 
-    def apagar(reloj):
-        reloj.registrar(DeltaAtributos(antorcha, 'encendida'))
-        antorcha.encendida = False
+    apagar = EjecutorEvento('antorcha', antorcha)
 
     reloj.programar_en(tiempo, apagar, tipo='apagado_antorcha', dueno=antorcha,
                         campo='evento_apagado', efecto=False)
@@ -164,11 +150,7 @@ def iniciar_regeneracion(reloj, enemigo):
 def _programar_pulso_regeneracion(reloj, enemigo):
     tiempo = reloj.tiempo_actual + INTERVALO_REGENERACION
 
-    def pulso(reloj):
-        if not enemigo.vivo:
-            return
-        enemigo.curar(enemigo.regeneracion)  # ya topa en vida_max y registra delta
-        _programar_pulso_regeneracion(reloj, enemigo)
+    pulso = EjecutorEvento('regeneracion', enemigo)
 
     reloj.programar_en(tiempo, pulso, tipo='regeneracion', dueno=enemigo,
                         campo='evento_regeneracion', efecto=True)
