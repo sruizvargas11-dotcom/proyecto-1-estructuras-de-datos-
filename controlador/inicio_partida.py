@@ -13,12 +13,13 @@ from modelo.partida import Partida
 class SesionPartida:
     """Lo que el controlador del juego necesita después del arranque."""
 
-    def __init__(self, partida, red, fuente, bitacora=None):
+    def __init__(self, partida, red, fuente, bitacora=None, esqueleto_desde_cache=None):
         self.partida = partida
         self.red = red
         self.fuente = fuente
         self.bitacora = bitacora
         self.acciones = Vector()
+        self.esqueleto_desde_cache = esqueleto_desde_cache
 
 
 def ruta_bitacora_por_defecto(cripta_id, semilla, carpeta=None):
@@ -80,7 +81,8 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
 
     generales = _generales(fuente, cripta_id)        # 1 solicitud
     _validar_jugador(generales)
-    cripta, _ = cargar_cripta(_FuenteConGenerales(fuente, generales), cripta_id, carpeta_cache)
+    cripta, desde_cache = cargar_cripta(_FuenteConGenerales(fuente, generales), cripta_id,
+                                        carpeta_cache)
 
     # Dos fábricas con prefijo distinto: los ids del contenido dependen solo del
     # orden de número de las solicitudes; los del botín, solo de las acciones.
@@ -107,4 +109,4 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     if ruta_bitacora is not None:
         bitacora = BitacoraPartida.partida_nueva(
             ruta_bitacora, cripta.id, cripta.version, version_catalogo, semilla)
-    return SesionPartida(partida, red, fuente, bitacora)
+    return SesionPartida(partida, red, fuente, bitacora, desde_cache)
