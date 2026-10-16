@@ -15,7 +15,7 @@ class Fila:
 
 
 def mediana(valores):
-    """Mediana con inserción propia (sin sorted ni .sort, §7)."""
+    """Calcula la mediana con inserción propia, sin recurrir al ordenamiento de Python."""
     orden = []
     for v in valores:
         i = len(orden)

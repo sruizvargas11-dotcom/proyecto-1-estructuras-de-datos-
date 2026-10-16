@@ -1,0 +1,368 @@
+{
+  "python": "3.12.14",
+  "sistema": "Windows-11-10.0.26300-SP0",
+  "procesador": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+  "semillas": [
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61
+  ],
+  "repeticiones": 7,
+  "calentamiento": 20,
+  "unidad": "mediana ms por ordenamiento; preparación de Vector excluida",
+  "filas": [
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 5,
+      "ms": 0.004269999953976367,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 5,
+      "ms": 0.014554999961546855,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 10,
+      "ms": 0.013940000008005882,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 10,
+      "ms": 0.03681500002130633,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 15,
+      "ms": 0.030559999959223205,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 15,
+      "ms": 0.06243499992706347,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 20,
+      "ms": 0.05060499997853185,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 20,
+      "ms": 0.09153999999398366,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 25,
+      "ms": 0.08075000005192123,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 25,
+      "ms": 0.12848000005760696,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 30,
+      "ms": 0.11206999997739331,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 30,
+      "ms": 0.15060499999890453,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 50,
+      "ms": 0.2993099999912374,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 50,
+      "ms": 0.29029500001342967,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 60,
+      "ms": 0.42499000001043896,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 60,
+      "ms": 0.3665000000182772,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 75,
+      "ms": 0.6481000000349013,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 75,
+      "ms": 0.48986000001605134,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 100,
+      "ms": 1.1570250000659144,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 100,
+      "ms": 0.681075000011333,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 200,
+      "ms": 4.607500000020082,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 200,
+      "ms": 1.578129999961675,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 500,
+      "ms": 28.785419999985606,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 500,
+      "ms": 4.639445000066189,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 5,
+      "ms": 0.002989999939018162,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 5,
+      "ms": 0.013424999997369014,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 10,
+      "ms": 0.006814999960624846,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 10,
+      "ms": 0.03593000001274049,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 15,
+      "ms": 0.010724999992817175,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 15,
+      "ms": 0.05983499995636521,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 20,
+      "ms": 0.01414500002283603,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 20,
+      "ms": 0.0882600000295497,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 25,
+      "ms": 0.019405000057304278,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 25,
+      "ms": 0.11593500003073132,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 30,
+      "ms": 0.020525000036286656,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 30,
+      "ms": 0.14256500007832074,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 50,
+      "ms": 0.05122500006109476,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 50,
+      "ms": 0.2759599999990314,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 60,
+      "ms": 0.0743749999855936,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 60,
+      "ms": 0.33493500004624366,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 75,
+      "ms": 0.10054000003947294,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 75,
+      "ms": 0.4558999999972002,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 100,
+      "ms": 0.1712049999696319,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 100,
+      "ms": 0.6492700000308105,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 200,
+      "ms": 0.6680849999611382,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 200,
+      "ms": 1.483265000024403,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 500,
+      "ms": 3.6564500000167754,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 500,
+      "ms": 4.35095500006355,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    }
+  ]
+}

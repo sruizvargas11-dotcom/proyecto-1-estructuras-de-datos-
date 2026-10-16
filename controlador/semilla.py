@@ -1,16 +1,11 @@
-"""Semilla de partida (plan v4, B3 ROL 1).
+"""Genera y valida las semillas de las partidas.
 
-Reglas:
-- Se genera automáticamente al iniciar una partida NUEVA. El jugador nunca la elige
-  y nunca se hardcodea.
-- Se guarda en el encabezado de la bitácora (BitacoraPartida) y en el archivo binario.
-- Al cargar una partida o reproducir un replay se REUTILIZA la semilla guardada: en ese
-  caso solo se valida, no se genera otra.
+Una partida nueva obtiene su semilla de SystemRandom y la guarda en la
+bitácora y el archivo binario. Al cargar o reproducir, se reutiliza la
+semilla guardada.
 
-La generación usa random.SystemRandom (entropía del sistema operativo), que es una
-instancia independiente: no toca el generador global del módulo random ni el
-random.Random(semilla) del Reloj. Esa es la única fuente no determinista del juego, y
-por eso vive en el controlador y no en el modelo.
+SystemRandom es independiente del generador de Reloj; crear una semilla
+no consume los valores aleatorios que usa el modelo.
 """
 import random
 

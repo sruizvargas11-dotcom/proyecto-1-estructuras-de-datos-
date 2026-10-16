@@ -157,7 +157,7 @@ def test_reemplazo_fallido_conserva_original_y_limpia_temporal(tmp_path):
 
 
 def test_escritores_no_comparten_temporal(tmp_path):
-    # Los hilos son solo una herramienta de prueba; el juego sigue síncrono.
+    # Los hilos fuerzan escrituras simultáneas para comprobar la integridad de la caché.
     import os
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
@@ -299,7 +299,7 @@ def test_lru_y_disco_permiten_recuperar_ficha_desalojada(tmp_path):
     memoria.desmarcar_en_uso('a')
     assert memoria.insertar('b', b)
     assert memoria.buscar('a') is None
-    # Composición de componentes: el servicio Catálogo se integra en bloque 3.
+    # Comprueba la composición de la caché persistente y la fuente de datos.
     recuperada = p.cargar_ficha('a')
     assert recuperada == a
     assert memoria.insertar('a', recuperada)

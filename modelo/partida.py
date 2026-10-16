@@ -74,12 +74,12 @@ class Partida:
         self.acciones_jugador = 0
         self.enemigos_derrotados = 0
 
-        # Observadores (Vector de funciones). Ver docstring del módulo.
+        # Funciones que reciben avisos de muerte, movimiento y mensajes del modelo.
         self.al_morir_enemigo = Vector()   # f(enemigo)
         self.al_entrar_sala = Vector()     # f(sala_anterior, sala_nueva)
         self.al_mensaje = Vector()         # f(tiempo, texto)
 
-        # Efectos temporales del rol 2: f(partida, objeto) -> bool. Ver usar_objeto.
+        # Función que aplica el efecto de un objeto: f(partida, objeto) -> bool.
         self.aplicar_efecto = None
 
         self.reloj.vincular_actor(jugador)
@@ -105,7 +105,7 @@ class Partida:
                 ("semilla", self.semilla))
 
     def resumen_puntaje(self):
-        """Campos de §2.12 (el nombre del jugador lo pide la vista)."""
+        """Resumen de acciones, enemigos derrotados, tiempo y resultado de la partida."""
         return (("cripta_id", self.cripta_id),
                 ("version_cripta", self.version_cripta),
                 ("acciones_jugador", self.acciones_jugador),

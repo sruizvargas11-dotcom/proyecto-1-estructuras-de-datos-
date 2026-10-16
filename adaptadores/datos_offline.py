@@ -2,14 +2,14 @@ import json
 import os
 from adaptadores.fuente_datos import FuenteDeDatos
 
-RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # implementacion de ruta absoluta
+RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # La ruta parte del módulo para no depender del directorio de ejecución.
 CARPETA_POR_DEFECTO = os.path.join(RAIZ, "datos_offline")
 
 class DatosOffline(FuenteDeDatos):
 
     def __init__(self, carpeta=None):
         if carpeta is None:
-            carpeta = CARPETA_POR_DEFECTO # aqui se modifica el acceso a ruta previo por el de la ruta absoluta
+            carpeta = CARPETA_POR_DEFECTO # Usa los datos incluidos en el repositorio si no se indica otra carpeta.
         self._carpeta = carpeta
         if not os.path.exists(self._carpeta):
             raise FileNotFoundError(
@@ -53,10 +53,7 @@ class DatosOffline(FuenteDeDatos):
         respuesta["criptas"] = disponibles
         return respuesta
 
-    # QUE CAMBIÓ:
-    # los metodos retornan exactamente lo mismo que su estado previo
-    # pero se adaptó cómo se accede a los archivos y los retornos vienen formateados
-    # para que el metodo lean el contenido de la ruta de los archivos a leer
+    # Cada método lee los archivos que corresponden a la misma consulta en HTTP.
 
     def datos_cripta(self, cripta_id):
         if not cripta_id:
@@ -77,7 +74,7 @@ class DatosOffline(FuenteDeDatos):
             raise ValueError(
                 f"Máximo 10 salas por consulta, recibido: {len(sala_ids)}"
             )
-        resultado = [] # se guardan en una "lista" los contenidos de cada sala que se vaya leyendo
+        resultado = [] # Conserva el orden de las salas solicitado por el controlador.
         for sala_id in sala_ids:
             ruta = os.path.join(cripta_id, "contenido", f"sala_{sala_id}.json")
             resultado.append(self._leer(ruta))
@@ -90,7 +87,7 @@ class DatosOffline(FuenteDeDatos):
             raise ValueError(
                 f"Máximo 10 ids por consulta, recibido: {len(tipo_ids)}"
             )
-        resultado = [] # se guardan en una "lista" las entidades de cada tipo a los que el metodo vaya accediendo
+        resultado = [] # Conserva el orden de los tipos solicitado por el controlador.
         for tipo_id in tipo_ids:
             ruta = os.path.join("catalogo", f"{tipo_id}.json")
             resultado.append(self._leer(ruta))
@@ -108,15 +105,6 @@ class DatosOffline(FuenteDeDatos):
         return "offline"
 
 
-""" la informacion recibida de la api se almacena en un json, un json por cada get basicamente
-se hace un wrapper funcion que lee un json normal y se implementa y se llama en el resto de metodos
- ,validaciones que pide el profe en el enunciado en las demas funciones heredadas se llama al
- wrapper y con el archivo por leer,manejo de excepciones en caso de errores 
- tiene sus test hechos por claude , y en verificar.py se ve todo corran ese archivo
-
-
-
-
-"""
+# Las pruebas iniciales de este adaptador se elaboraron con asistencia de Claude.
 
 

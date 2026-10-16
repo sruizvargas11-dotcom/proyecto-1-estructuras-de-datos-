@@ -1,0 +1,312 @@
+{
+  "python": "3.12.14",
+  "sistema": "Windows-11-10.0.26300-SP0",
+  "procesador": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+  "semillas": [
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61
+  ],
+  "repeticiones": 7,
+  "calentamiento": 20,
+  "unidad": "mediana ms por ordenamiento; preparación de Vector excluida",
+  "filas": [
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 5,
+      "ms": 0.0038999999560473952,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 5,
+      "ms": 0.01405000002705492,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 10,
+      "ms": 0.01662499998928979,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 10,
+      "ms": 0.045434999992721714,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 15,
+      "ms": 0.03050499999517342,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 15,
+      "ms": 0.06353499993565492,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 20,
+      "ms": 0.050319999991188524,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 20,
+      "ms": 0.0934350000534323,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 25,
+      "ms": 0.078034999933152,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 25,
+      "ms": 0.12367500003165333,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 30,
+      "ms": 0.11150000000270666,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 30,
+      "ms": 0.15229000000545057,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 50,
+      "ms": 0.296745000014198,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 50,
+      "ms": 0.29572999992524274,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 100,
+      "ms": 1.1395749999792315,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 100,
+      "ms": 0.6892249999509659,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 200,
+      "ms": 4.573310000068886,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 200,
+      "ms": 1.5702549999332405,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 500,
+      "ms": 31.96051000004445,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 500,
+      "ms": 5.1031699999839475,
+      "extra": "aleatorio; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 5,
+      "ms": 0.003190000006725313,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 5,
+      "ms": 0.017519999983051093,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 10,
+      "ms": 0.006965000011405209,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 10,
+      "ms": 0.03747000000657863,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 15,
+      "ms": 0.01555499993628473,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 15,
+      "ms": 0.08606500005043927,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 20,
+      "ms": 0.022064999939175323,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 20,
+      "ms": 0.1278900000215799,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 25,
+      "ms": 0.019580000025598565,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 25,
+      "ms": 0.12097000007997849,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 30,
+      "ms": 0.020655000025726622,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 30,
+      "ms": 0.14596000000892673,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 50,
+      "ms": 0.050225000086356886,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 50,
+      "ms": 0.30876000000716886,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 100,
+      "ms": 0.17811500001698732,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 100,
+      "ms": 0.7300450000002456,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 200,
+      "ms": 0.7693550000112737,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 200,
+      "ms": 1.822384999923088,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "insertion_sort",
+      "n": 500,
+      "ms": 4.341779999958817,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    },
+    {
+      "caso": "ordenamiento",
+      "variante": "merge_sort",
+      "n": 500,
+      "ms": 5.283969999982219,
+      "extra": "casi_ordenado; rep=7; muestras=20"
+    }
+  ]
+}

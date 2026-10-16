@@ -1,13 +1,8 @@
-"""
-Cola (FIFO) con capacidad configurable, construída sobre nodos de un solo sentido
-(no una lista doble: encolar y desencolar nunca necesitan ir hacia atrás).
-Un puntero directo a _final evita recorrer la cola para agregar al final.
+"""Cola FIFO con nodos enlazados y una referencia al último nodo.
 
-Al llegar al límite, el enunciado puede pedir dos comportamientos según su uso:
-aquí se descarta el más antiguo (igual que el array circular), adecuado para conservar
-los últimos mensajes de la bitácora de la consola.
-Para la precarga de salas se usa sin límite, evitando descartar solicitudes pendientes.
-
+Encolar y desencolar cuestan O(1). Si se fija una capacidad, al llenarse
+se descarta el elemento más antiguo. La precarga usa la cola sin límite
+para conservar todas las solicitudes pendientes.
 """
 
 class _NodoCola:

@@ -116,7 +116,8 @@ class ResultadoReplay:
         return self.diferencia is None
 
 
-def reproducir(ruta_log, fuente, carpeta_cache=None, escribir=None, cache_size=25):
+def reproducir(ruta_log, fuente, carpeta_cache=None, escribir=None, cache_size=25,
+               despachador=None):
     """Reproduce la bitácora. Lanza ErrorVersionIncompatible antes de ejecutar
     cualquier acción si los datos actuales no son los del log, y
     ErrorReplayDivergente si la reproducción se separa de lo registrado."""
@@ -132,7 +133,8 @@ def reproducir(ruta_log, fuente, carpeta_cache=None, escribir=None, cache_size=2
     # Cargar la cripta y el catálogo no ejecuta acciones; da las versiones
     # vigentes sin gastar solicitudes extra.
     sesion = nueva_partida(fuente, bitacora.cripta_id, carpeta_cache,
-                           semilla=bitacora.semilla, ruta_bitacora=None, cache_size=cache_size)
+                           semilla=bitacora.semilla, ruta_bitacora=None, cache_size=cache_size,
+                           despachador=despachador)
     try:
         return _reproducir_sesion(sesion, bitacora, acciones, cierre_original, escribir)
     except (ErrorVersionIncompatible, ErrorReplayDivergente) as error:

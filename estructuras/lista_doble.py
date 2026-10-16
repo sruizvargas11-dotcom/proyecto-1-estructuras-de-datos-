@@ -1,7 +1,7 @@
-"""
-Lista doblemente enlazada: NodoDoble con punteros anterior y siguiente. A diferencia de la otra lista simple,
-eliminar_nodo() y mover_al_frente() son O(1) cuando ya se tiene el nodo a mano, porque no hace falta recorrer
-buscando el anterior. Es la base de la pila y la lista LRU.
+"""Lista doblemente enlazada para inventarios, pilas y cachés LRU.
+
+Cada nodo conserva sus vecinos. Con una referencia al nodo se puede
+eliminarlo o moverlo al frente en O(1), sin recorrer la lista.
 """
 
 
@@ -98,8 +98,7 @@ class ListaDoble:
 
 
     def eliminar_nodo(self, nodo):
-        """O(1): no se busca nada, se reconectan directamente los vecinos del nodo
-                que ya se tiene en la mano."""
+        """Elimina un nodo conocido en O(1) y vuelve a enlazar sus vecinos."""
         self._validar_nodo(nodo)
         self._desenlazar(nodo)
 
@@ -178,7 +177,7 @@ class ListaDoble:
             actual = actual.siguiente
 
     def recorrer_desde_fondo(self):
-        """Generador de nodos, de cola hacia el head."""
+        """Recorre los nodos desde la cola hasta la cabeza."""
         self.contador_recorridos_desde_fondo += 1
         actual = self._cola
 

@@ -56,7 +56,10 @@ class Historial:
         return True
 
     def confirmar_accion(self):
-        """Llamar al llegar a la SIGUIENTE decisión, tras enemigos y efectos."""
+        """Confirma el intervalo al llegar a la siguiente decisión del jugador.
+
+        Incluye las acciones de enemigos y los efectos ocurridos durante la espera.
+        """
         if not self.registrando:
             raise RuntimeError('No hay intervalo abierto para confirmar.')
         self._grupos.apilar_elemento(self._actual)

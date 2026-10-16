@@ -164,24 +164,21 @@ class _SolicitudContenido:
 
 
 class ControladorRed:
-    """Carga de contenido y catálogo con orden determinista (B2 + B3 ajuste 6).
+    """Coordina la carga de salas y fichas en un orden reproducible.
 
-    Ciclo de una solicitud de contenido:
-      1. DECIDIR (hilo principal, solo con estado del juego): planificar_precarga,
-         procesar_cola, garantizar_contenido o solicitar_contenido_lote arman un
-         lote de salas aún no solicitadas. Se lee del disco lo vigente.
-      2. NUMERAR: el lote recibe el siguiente número en el buffer de reordenamiento,
-         aunque todo venga de disco (así el orden de incorporación no depende de la
-         caché). Se anota en el registro de solicitudes.
-      3. ENVIAR: si faltan salas, el despachador llama a la fuente (en el acto o en
-         otro hilo). La respuesta se entrega al buffer.
-      4. INCORPORAR (hilo principal, en puntos fijos): incorporar_listas() toma las
-         respuestas estrictamente en orden de número, resuelve su catálogo (también
-         numerado, como sub-solicitudes n.1, n.2...) y puebla las salas.
-         Incorporar NO activa enemigos ni programa eventos (§2.4).
-    Puntos fijos: antes de cada acción del jugador (lo llama el controlador del
-    juego), dentro de garantizar_contenido / asegurar_entrada y al final de
-    procesar_cola.
+    El hilo principal decide qué salas necesita y reúne un lote de hasta 10.
+    Cada lote recibe un número, incluso si su contenido está en disco, para
+    que la caché no cambie el orden de incorporación. El despachador consulta
+    la fuente y entrega el resultado al buffer.
+
+    Las respuestas se incorporan por número de solicitud. En ese momento se
+    resuelve el catálogo y se construyen las entidades, sin activar enemigos
+    ni programar sus eventos. El catálogo de cada lote usa subsolicitudes
+    como n.1 y n.2.
+
+    La incorporación ocurre antes de una decisión del jugador, al garantizar
+    la entrada a una sala y al terminar de procesar la cola. Así, la velocidad
+    de la red no determina cuándo una respuesta cambia el modelo.
     """
 
     MAX_LOTE = 10
@@ -352,9 +349,10 @@ class ControladorRed:
         return self.incorporar_listas()
 
     def solicitar_contenido_lote(self, sala_ids):
-        """Carga hasta 10 salas y espera a que queden incorporadas.
-        
-          Devuelve cuántas salas de ESTE lote se incorporaron."""
+        """Carga hasta 10 salas y espera a que se incorporen.
+
+        Devuelve cuántas salas de este lote se incorporaron.
+        """
         if len(sala_ids) > self.MAX_LOTE:
             raise ValueError(f"Un lote admite como máximo {self.MAX_LOTE} salas.")
 
@@ -369,7 +367,7 @@ class ControladorRed:
             elif not self.contenido_solicitado(sala_id) and not _contiene(por_cargar, sala_id):
                 por_cargar.agregarValor(sala_id)
 
-        # 2-3. Enviar el lote propio como UNA solicitud numerada.
+        # Envía el lote con un único número de solicitud.
         propia = None
         if len(por_cargar) > 0:
             try:
@@ -435,7 +433,7 @@ class ControladorRed:
             return f"No se puede entrar a la sala {sala_id}: su contenido no está disponible ({error})."
 
     def incorporar_listas(self):
-        """PUNTO FIJO: incorpora, en orden de número, las respuestas ya llegadas."""
+        """Incorpora las respuestas disponibles respetando el orden de solicitud."""
         total = 0
         while True:
             tomada = self._buffer.tomar_siguiente()
@@ -561,7 +559,7 @@ class ControladorRed:
         self.incorporar_listas()
 
     def _completar_solicitud(self, solicitud, respuesta):
-        """Paso 4 para UNA solicitud (ya en su turno). Todo o nada."""
+        """Incorpora una solicitud completa cuando le corresponde su turno."""
         datos_lote = solicitud.datos_lote
         for indice, (sala_id, datos) in enumerate(datos_lote):
             if datos is None:
@@ -641,7 +639,7 @@ class ControladorRed:
         self._registro.agregarValor((numero, sub, "catalogo", tuple(lote), True))
 
     def _fallo(self, sala_ids, error, solicitud=None):
-        """Las salas vuelven a ser pedibles y a la cola; se informa sin caer."""
+        """Reencola las salas afectadas y conserva el error para informar del fallo."""
         for sala_id in sala_ids:
             for indice, solicitada in enumerate(self._solicitadas):
                 if solicitada == sala_id:
@@ -735,10 +733,8 @@ class ControladorRed:
         for tipo_id in datos["objetos"]:
             ficha = self._ficha_de_clase(tipo_id, None)
             objetos.insertar_al_final(self._fabrica.crear(ficha))
-            # Un objeto solo protege su ficha si queda en el inventario o en
-            # el suelo de la sala ACTUAL (Sec. 4.4), no de cualquier sala
-            # cargada. Esa decisión depende del bucle de movimiento (ROL 4)
-            # y no se marca aquí todavía: ver docs/decisiones/4.03.txt.
+            # Los objetos quedan protegidos al estar en el inventario o en el suelo de
+            # la sala actual. ControladorJuego actualiza esas referencias al moverse.
 
         for t in datos["trampas"]:
             ficha = self._ficha_de_clase(t["tipo"], ("trampa",))

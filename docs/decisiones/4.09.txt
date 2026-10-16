@@ -1,23 +1,62 @@
 4.9 - ORDENAMIENTO
-(Redacta ROL 2, Revisa ROL 1)
-
-Borrador técnico B2, 11-10-2026. Revisión automatizada ejecutada; revisión humana del rol indicado pendiente.
+Redacta: rol 2. Revisa: rol 1.
+Cierre del bloque 4: 16 de octubre de 2026. Pendiente de revisión por el rol 1.
 
 1 - PROBLEMA
-Ordenar vistas de inventario por diferentes criterios con algoritmos propios y conservar el orden relativo de elementos equivalentes.
+El juego necesita mostrar los objetos ordenados sin cambiar su posición real en el inventario. También debe conservar el orden relativo de los objetos que tienen el mismo valor para el criterio elegido. Para decidir qué algoritmo usar, hace falta medir las implementaciones que realmente utiliza el juego.
+
+La calibración ejecuta 20 ordenamientos por repetición, con 7 repeticiones para cada algoritmo y tamaño de entrada. Antes de medir, realiza otros 20 ordenamientos de calentamiento. Las entradas se generan con las semillas 42 a 61.
+
+La ruta de victoria usada para contar las operaciones del juego no incluye consultas de inventario ordenado, así que en esa partida la frecuencia de esas consultas fue cero. Ese resultado describe el guion de prueba; un jugador que use I peso, I valor o I nombre sí ejecutará esos ordenamientos.
 
 2 - ALTERNATIVAS
-InsertionSort: bajo costo adicional y muy bueno en entradas pequeñas u ordenadas, pero cuadrático en peor caso. MergeSort: O(n log n) garantizado y estable con memoria auxiliar. Quicksort no se incorpora: versión usual in-place no garantiza estabilidad y puede ser cuadrática con pivotes desfavorables.
+Comparamos InsertionSort y MergeSort. InsertionSort cuesta O(n+I), donde I es la cantidad de inversiones de la entrada, y suele necesitar poco trabajo cuando los datos ya están ordenados o casi ordenados. MergeSort mantiene un costo O(n log n) independientemente del orden inicial, a cambio de utilizar memoria auxiliar.
+
+Para que la comparación sirva para elegir el umbral del juego, el benchmark llama directamente a insertion_sort y merge_sort de estructuras/ordenamientos.py. Ambos trabajan sobre nuestro Vector, con los mismos contadores y el mismo comparador. Medir otras implementaciones sobre list, como hacía el benchmark anterior, no permitía justificar el umbral de estas funciones.
 
 3 - DECISIÓN
-Se conserva estructuras/ordenamientos.py del compañero. ordenar elige Insertion para n <= 30 si la comparación no es costosa; para entradas mayores detecta si están completamente ordenadas mediante descensos adyacentes. Cero descensos permite Insertion; otros casos usan Merge. Comparación costosa fuerza Merge. Ambos son estables. No se usa list.sort en producción.
-No se interpreta pocos descensos como pocas inversiones: dos bloques invertidos pueden exigir muchos desplazamientos.
+Se fijó UMBRAL_TAMANO_PEQUENO en 50. Cuando la entrada tiene como máximo 50 elementos y la comparación no está marcada como costosa, ordenar elige InsertionSort. Para entradas mayores, solo lo elige si detecta que los datos ya están completamente ordenados; en los demás casos usa MergeSort. Si la comparación está marcada como costosa, se mantiene la selección de MergeSort. Los dos algoritmos son estables.
 
-4 - COMPLEJIDAD ALGORÍTMICA
-Insertion: O(n+I), con I inversiones; peor O(n²), espacio auxiliar O(1). Merge: O(n log n), pico de memoria auxiliar O(n), pila O(log n). Selector O(n) cuando recorre descensos, O(1) para caso pequeño.
+El criterio de calibración fue conservar el último tamaño medido antes de que MergeSort redujera el tiempo de InsertionSort en al menos un 10% con datos aleatorios y mantuviera esa ventaja en los tamaños mayores. En n=50, la diferencia fue menor del 10%. En 60, 75, 100, 200 y 500, la ventaja de MergeSort superó ese margen.
+
+Los tamaños 5, 10, 15, 20, 25 y 30 no mostraron un cruce entre ambos algoritmos, por lo que ampliamos los tamaños de la prueba. El umbral de 50 ofrece una elección prudente cuando no conocemos el desorden de la entrada, aunque no sea el mejor valor para todas las distribuciones.
+
+Tampoco se interpreta una cantidad pequeña de descensos entre elementos vecinos como garantía de pocas inversiones. Una entrada puede tener pocos descensos y aun así exigir muchos desplazamientos a InsertionSort.
+
+4 - COMPLEJIDAD
+InsertionSort cuesta O(n+I), llega a O(n²) en el peor caso y utiliza O(1) de memoria auxiliar. MergeSort cuesta O(n log n), requiere O(n) de memoria auxiliar y tiene una profundidad de recursión O(log n).
+
+El selector decide en O(1) cuando la entrada es pequeña. Para las entradas mayores, comprobar si ya están ordenadas requiere un recorrido O(n).
 
 5 - EVIDENCIA
-Pruebas existentes comparan resultados, estabilidad, entradas ordenadas e invertidas y selección de algoritmo. Suite completa: 345 aprobadas. El umbral 30 sigue PROVISIONAL. Bench B4: tamaños 5/10/20/30/50/100, aleatorios y casi ordenados, comparaciones baratas/costosas, repeticiones, medianas y equipo.
+Las mediciones se guardaron en docs/evidencia/2026-10-16-ordenamiento.json y docs/evidencia/2026-10-16-ordenamiento-confirmacion.json. Se ejecutaron en Windows 11 con Python 3.12.14 y un procesador identificado como AMD64 Family 25 Model 33 Stepping 2.
+
+Se utilizó perf_counter y se tomó la mediana de 7 repeticiones, cada una con 20 entradas distintas. Hubo un calentamiento previo y se alternó el orden de ejecución de los algoritmos para evitar favorecer siempre al segundo. El tiempo medido excluye la construcción de los vectores, las consultas de red, la presentación en pantalla y las impresiones de resultados.
+
+La tabla corresponde a la corrida de confirmación. Los valores están en milisegundos por ordenamiento: el tiempo de cada lote se dividió entre sus 20 entradas. Las columnas «casi» corresponden a los datos casi ordenados.
+
+n | Insertion aleatorio | Merge aleatorio | Insertion casi | Merge casi
+5   | 0.004 | 0.015 | 0.003 | 0.013
+10  | 0.014 | 0.037 | 0.007 | 0.036
+15  | 0.031 | 0.062 | 0.011 | 0.060
+20  | 0.051 | 0.092 | 0.014 | 0.088
+25  | 0.081 | 0.128 | 0.019 | 0.116
+30  | 0.112 | 0.151 | 0.021 | 0.143
+50  | 0.299 | 0.290 | 0.051 | 0.276
+60  | 0.425 | 0.367 | 0.074 | 0.335
+75  | 0.648 | 0.490 | 0.101 | 0.456
+100 | 1.157 | 0.681 | 0.171 | 0.649
+200 | 4.608 | 1.578 | 0.668 | 1.483
+500 | 28.785 | 4.639 | 3.656 | 4.351
+
+Para repetir la calibración y guardar los resultados:
+python -m bench.calibrar_ordenamiento --salida evidencia.json
+
+El mismo caso de ordenamiento también forma parte de python main.py --bench.
 
 6 - LÍMITES
-No se afirma que 30 sea óptimo sin medir. Una comparación debe ser consistente. El tiempo real depende del tamaño y costo de comparar. La vista ordenada agrega una copia O(n) para conservar el inventario y su cursor.
+En esta prueba, una entrada «casi ordenada» se construye a partir de datos ordenados y luego se realizan max(1,n//20) intercambios de posiciones aleatorias. Esto no garantiza una proporción fija de inversiones. Con esa distribución, InsertionSort siguió siendo más rápido hasta 500 elementos.
+
+La selección actual puede perder esa ventaja en entradas grandes que estén casi ordenadas. Aceptamos esa limitación para evitar elegir un algoritmo cuadrático basándonos únicamente en pocos descensos entre vecinos, ya que estos pueden ocultar muchas inversiones.
+
+Esta calibración no cubre comparaciones costosas ni tamaños mayores de 500. Por eso, no se afirma que el umbral sea óptimo en esos casos. Conviene repetir las mediciones si cambia la máquina, el intérprete, el Vector, el comparador o la implementación de los algoritmos.

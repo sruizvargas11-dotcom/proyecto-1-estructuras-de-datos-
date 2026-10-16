@@ -1,8 +1,7 @@
-"""
-Reemplaza el ArrayOrdenado provisional que usaba ControladorRed. Verifica
-que las fichas resueltas queden en una ListaLRU real (sin dict), que un
-enemigo vivo proteja su ficha de desalojo, y que notificar_muerte_enemigo
-libere esa protección para que la política de desalojo pueda actuar.
+"""Pruebas de la LRU del catálogo y sus referencias activas.
+
+Comprueban que los enemigos vivos protejan sus fichas y que estas puedan
+desalojarse después de liberar todas las referencias.
 """
 
 import pytest
@@ -85,8 +84,10 @@ def test_ficha_protegida_no_se_desaloja_aunque_la_cache_se_llene(offline, tmp_pa
 
 
 def test_notificar_muerte_enemigo_libera_la_ficha_para_desalojo(offline, tmp_path):
-    """sala_2 trae DOS ratas (e-201, e-202) que comparten ficha: hay que
-    notificar la muerte de ambas antes de que la ficha quede libre."""
+    """Las dos ratas de la sala 2 comparten ficha (e-201 y e-202).
+
+    La ficha solo queda libre después de notificar la muerte de ambas.
+    """
     fuente, cripta = offline
     red = ControladorRed(fuente, cripta, tmp_path, cache_size=3)
 

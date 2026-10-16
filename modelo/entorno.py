@@ -1,7 +1,8 @@
-"""Eventos del rol 3: entrada a trampas y cierre automático de salidas.
+"""Activación de trampas y cierre automático de puertas.
 
-El controlador valida movimiento/llave/contenido antes de llamar estos métodos.
-No consumen tiempo: suceden en el instante de ejecución de la acción.
+El controlador valida el movimiento, la llave y el contenido de la sala
+antes de llamar a estos métodos. Sus efectos ocurren en el instante
+de la acción y no añaden un costo de tiempo por separado.
 """
 from modelo.deltas import DeltaPuerta, DeltaTrampa
 from modelo.reloj import entero
@@ -13,10 +14,10 @@ class Entorno:
         self.reloj = reloj
 
     def activar_trampa(self, trampa, actor, aplicar_efecto=None):
-        """El efecto opcional recibe (trampa, actor, reloj); por defecto, daño.
+        """Activa la trampa y aplica su daño o el efecto recibido.
 
-        Permite al rol 2 conectar un efecto de catálogo sin decidir aquí sus
-        reglas de veneno. Registrar sus cambios mediante el historial compartido.
+        El efecto opcional recibe (trampa, actor, reloj) y debe registrar sus
+        cambios en el historial compartido para permitir el retroceso.
         """
         if not trampa.armada or not actor.vivo:
             return False

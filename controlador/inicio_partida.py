@@ -91,8 +91,7 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     red = ControladorRed(fuente, cripta, carpeta_cache, fabrica=fabrica_contenido,
                          cache_size=cache_size, despachador=despachador)
     sala_inicial = cripta.sala_por_id(cripta.sala_inicial_id)
-    # Encolar vecinas ANTES: garantizar_contenido completa el lote con ellas y todo
-    # viaja en una sola solicitud de contenido.
+    # Encola primero las vecinas para incluirlas en el lote de la sala inicial.
     red.planificar_precarga(sala_inicial)
     red.garantizar_contenido(sala_inicial.id)
     # Para la bitácora; normalmente ya se obtuvo al resolver el catálogo del lote.

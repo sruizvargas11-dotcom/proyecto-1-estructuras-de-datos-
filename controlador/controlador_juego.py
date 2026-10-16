@@ -450,7 +450,7 @@ class ControladorJuego:
 
 
     def _sincronizar_protegidas(self):
-        """Recalcula qué fichas protege la posición actual (robusto al retroceso)."""
+        """Actualiza las fichas protegidas según la posición y el inventario del jugador."""
         nuevas = Vector()
         for nodo in self.jugador.inventario.recorrer_desde_frente():
             nuevas.agregarValor(nodo.valor.tipo_id)

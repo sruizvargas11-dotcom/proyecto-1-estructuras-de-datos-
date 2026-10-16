@@ -256,10 +256,11 @@ class TestCargarSalaBinaria:
         assert partida.cargar_sala_binaria(999) is None
 
     def test_busqueda_binaria_en_disco_con_200_salas_desordenadas(self, ruta_binaria):
-        """La búsqueda binaria ahora se hace directamente sobre el índice en
-        disco (sin cargarlo completo): se verifica que sigue encontrando la
-        sala correcta en los extremos y en el medio, con un índice grande y
-        guardado fuera de orden."""
+        """Comprueba la búsqueda en disco con un índice grande guardado fuera de orden.
+
+        Consulta salas de los extremos y del medio para cubrir los límites
+        de la búsqueda binaria.
+        """
         rnd = random.Random(7)
         ids = list(range(200))
         rnd.shuffle(ids)

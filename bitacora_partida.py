@@ -79,7 +79,7 @@ class BitacoraPartida:
         self._archivo.flush()
 
     def registrar_cierre(self, tiempo: int, estado: str, lineas_estado):
-        """Línea 'fin' y debajo el estado final completo; el replay lo compara."""
+        """Registra el cierre y las líneas del estado observable que compara el replay."""
         self.registrar(tiempo, f"{CIERRE} {estado}")
         for linea in lineas_estado:
             self._archivo.write(f"{ESTADO}{linea}\n")

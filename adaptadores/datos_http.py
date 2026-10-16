@@ -1,7 +1,4 @@
-"""
-Adaptador HTTP real de FuenteDeDatos.
-Es el único módulo del proyecto que sabe que existe una API REST detrás.
-"""
+"""Consultas al servicio de CRIPTA, con control de presupuesto y reintentos."""
 
 import time
 import uuid
@@ -11,10 +8,10 @@ import requests
 from adaptadores.fuente_datos import FuenteDeDatos
 
 BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1"
-## Recomendación: Utilizar la API Key como una variable de entorno para no exponerla
+# Cada cliente se identifica ante el servicio mediante X-Cripta-Client-Id.
 
 class DatosHTTP(FuenteDeDatos):
-    """Implementación de FuenteDeDatos que consume el api  de la cripta."""
+    """Obtiene los datos de la cripta a través de la interfaz FuenteDeDatos."""
 
     def __init__(self, max_reintentos=3):
         if type(max_reintentos) is not int or max_reintentos < 0:
@@ -29,7 +26,7 @@ class DatosHTTP(FuenteDeDatos):
 
 
     def _get(self, ruta: str, params: dict = None) -> dict:
-        """se comunica con el servidor aca pasan los gets """
+        """Ejecuta un GET y cuenta cada intento dentro del presupuesto disponible."""
         reintentos = 0
         while True:
             if self._presupuesto is not None and self._contador >= self._presupuesto:
@@ -69,12 +66,12 @@ class DatosHTTP(FuenteDeDatos):
 
 
     def listar_criptas(self) -> dict:
-        """GET #1 — lista de criptas disponibles."""
+        """Consulta las criptas disponibles."""
         return self._get("/criptas")
 
 
     def datos_cripta(self, cripta_id: str) -> dict:
-        """GET #2 -datos generales y se tiene la cantidad de solicitudes """
+        """Obtiene los datos generales y establece el presupuesto de solicitudes."""
         respuesta = self._get(f"/criptas/{cripta_id}")
         presupuesto = respuesta.get("presupuesto_solicitudes")
         if type(presupuesto) is not int or presupuesto < 0:
@@ -86,34 +83,32 @@ class DatosHTTP(FuenteDeDatos):
 
 
     def esqueleto_cripta(self, cripta_id: str, pagina: int) -> dict:
-        """"'informacion del esqueleto de la cripta"""
+        """Consulta una página del mapa de salas."""
         return self._get(f"/criptas/{cripta_id}/salas", params={"pagina": pagina})
 
     def contenido_salas(self, cripta_id: str, sala_ids: list) -> dict:
-        """"'contenido de salas listado,se permiten 10 salas por solicitud """
+        """Obtiene el contenido de un lote de hasta 10 salas."""
         if not sala_ids or len(sala_ids) > 10:
             raise ValueError("tope de maximo 10 salas por solicitud")
         salas = ",".join(str(s) for s in sala_ids)
         return self._get(f"/criptas/{cripta_id}/contenido", params={"salas": salas})
 
     def catalogo(self, tipo_ids: list) -> dict:
-        """"'informacion del catalogo se unen los ids por formato y se verifican el maximo
-        10 ids
-        """
+        """Consulta hasta 10 fichas del catálogo por sus identificadores."""
         if not tipo_ids or len(tipo_ids) > 10:
             raise ValueError("Máximo 10 ids por solicitud")
         ids = ",".join(tipo_ids)
         return self._get("/catalogo", params={"ids": ids})
 
     def version_cripta(self, cripta_id: str) -> dict:
-        """"'version de la cripta """
+        """Consulta la versión actual de la cripta."""
         return self._get(f"/criptas/{cripta_id}/version")
 
     def version_catalogo(self) -> dict:
-        """"'version del catalogo"""
+        """Consulta la versión actual del catálogo."""
         return self._get("/catalogo/version")
 
-    """"'metodos momentaneos son para verificar la funcionalidad de la conexion"""
+    # Métricas del cliente para el reporte de solicitudes.
     @property
     def requests_realizados(self) -> int:
         return self._contador
@@ -137,25 +132,4 @@ class DatosHTTP(FuenteDeDatos):
         }
 
 
-"""
-explicacion general del flujo de trabajo se crea una interfaz comun fuente_datos.py
-esta es la interfaz que se va a comunicar con nuestro modelo de esta se genera un adaptador htpp
-encargada de la conexion de la api y los gets primero declaramos la url de la api ,
-de ahi la clase con sus respectivos variables  url declarada previamente , cliente con su
-uuid unico ,header que pide el profe en el enunciado xd , un contador de respuestas 
-y una variable de presupuesto para gestionar y medir el presupuesto de solicitud ,
----como trabajamos el json-----
-   en  def _get(self, ruta: str, params: dict = None) -> dict: 
-   recibimos una ruta,parametros enviados por referencia y un diccionario para leer el json
-   en la variable respuesta que guarda la ruta , los parametros osea la informacion contenida en el json
-   por cada solicitud o entrada el contador aumenta y ahora si hacemos la confirmacion que
-   pide el profe en el enunciado si la respuesta ==200 se procesa o se lee 
-   se hacen 2 validaciones mas el resto de funciones hasta las que dicen property 
-   son los otros get con sus validaciones de limite de consultas
-
-   las otras funciones ignorenla de momento son para verificar la consulta del json eventuamente se van a quitar
-   otra cosa se crea un archivo verificar momentaneo para que vean los gets y la consulta hecha por la api
-   la carpeta test son hechos por AI que verifican el codigo , por cada flujo se van hacer test
-   para que todo este joya
-
-"""
+# Las pruebas iniciales de este adaptador se elaboraron con asistencia de IA.

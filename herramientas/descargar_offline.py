@@ -15,25 +15,25 @@ def guardar(ruta, objeto): # crea las carpetas que hagan falta
         json.dump(objeto, archivo, ensure_ascii=False, indent=2)
     print(f" Guardado: {ruta}")
 
-def agrupar(lista, tamano): # agrupar información para mostrarla en lotes de 10
+def agrupar(lista, tamano): # Divide las consultas para respetar el límite de cada solicitud.
     grupos = []
     for i in range(0, len(lista), tamano):
         grupos.append(lista[i:i + tamano])
     return grupos
 
-def agregar_sin_repetir(lista, valor): # utiliza una lista para retornar siempre el mismo orden
+def agregar_sin_repetir(lista, valor): # Evita duplicados sin cambiar el orden de descubrimiento.
     if valor not in lista:
         lista.append(valor)
 
 def main():
-    "guardado de datos de la cripta"
+    """Descarga los datos de una cripta para poder jugar sin conexión."""
     http = DatosHTTP()
     cripta_id = sys.argv[1] if len(sys.argv) > 1 else "cripta-01"
     guardar("criptas.json", http.listar_criptas())
     guardar(os.path.join(cripta_id, "general.json"), http.datos_cripta(cripta_id))
     guardar(os.path.join(cripta_id, "version.json"), http.version_cripta(cripta_id))
 
-    "armado del esqueleto para las páginas"
+    # Recorre todas las páginas del mapa y reúne los identificadores de sala.
     ids_salas = []
     pagina = 1
     total_paginas = 1
@@ -45,7 +45,7 @@ def main():
             ids_salas.append(sala["id"])
         pagina += 1
 
-    "se muestran las salas agrupadas, adjuntas al contenido de c/u de ellas"
+    # Descarga el contenido en lotes y guarda un archivo por sala.
     tipos = []
     for lote in agrupar(ids_salas, MAX_POR_LOTE):
         respuesta = http.contenido_salas(cripta_id, lote)
@@ -58,7 +58,7 @@ def main():
             for trampa in sala["trampas"]:
                 agregar_sin_repetir(tipos, trampa["tipo"])
 
-    "guardado del catalogo"
+    # Resuelve el catálogo, incluidos los tipos que aparecen en el botín.
     i = 0
     while i < len(tipos):
         lote = tipos[i:i + MAX_POR_LOTE]
@@ -72,7 +72,6 @@ def main():
     guardar("catalogo_version.json", http.version_catalogo())
     print(http.reporte())
 
-    "se utiliza while porque la lista de tipos puede crecer mientras se recorre"
 
 if __name__ == "__main__":
     main()

@@ -131,8 +131,12 @@ def jugar(fuente, cripta_id, opciones):
 
 
 def reproducir(fuente, opciones):
-    """--replay: sin vista interactiva. Códigos de salida: 0 idéntico,
-    2 versión incompatible, 3 la reproducción divergió del log."""
+    """Reproduce un log sin interacción.
+
+    Devuelve 0 si las acciones se reproducen sin errores, 2 si las versiones
+    no coinciden y 3 si hay una divergencia. La verificación del estado final
+    requiere que el log tenga un cierre registrado.
+    """
     from bitacora_partida import ErrorVersionIncompatible
     from controlador.controlador_replay import ErrorReplayDivergente, reproducir as replay
 

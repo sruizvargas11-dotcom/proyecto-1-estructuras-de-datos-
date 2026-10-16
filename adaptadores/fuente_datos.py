@@ -1,7 +1,4 @@
-"""
-Adaptadores de red y disco detrás de una interfaz común.
-El modelo sólo conoce FuendeDeDatos, nunca ningún request ni archivos directos.
-"""
+"""Interfaz común para consultar criptas y catálogos desde HTTP o archivos locales."""
 
 from abc import ABC, abstractmethod
 

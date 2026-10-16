@@ -1,49 +1,37 @@
 4.3 - RESOLUCIÓN DE REFERENCIAS DEL CATÁLOGO
-(Redacta ROL 2, Revisa ROL 4)
-
-Borrador técnico B3, 13-10-2026. Revisión humana del rol indicado pendiente.
+Redacta: rol 2. Revisa: rol 4.
+Cierre del bloque 4: 16 de octubre de 2026. Pendiente de revisión por el rol 4.
 
 1 - PROBLEMA
-El contenido de una sala trae tipo_id de texto (ent_rata_gigante, itm_daga_oxidada); resolver cada instancia a su ficha completa (vida_max, ataque, suelta, etc.)
-es una de las operaciones más frecuentes del juego, porque se ejecuta al incorporar cada sala y cada vez que el modelo necesita leer un atributo
-compartido de un enemigo u objeto. El enunciado exige además que una ficha referenciada por una instancia activa no pueda liberarse de memoria
-mientras esa instancia exista.
+Cuando el juego recibe el contenido de una sala, necesita convertir cada tipo_id en la ficha que describe al enemigo, objeto o trampa correspondiente. Esta consulta debe aprovechar las fichas que ya están cargadas para evitar descargas repetidas. Además, una ficha debe permanecer en memoria mientras alguna instancia la esté usando.
+
+En la partida de ensayo con semilla 3 se registraron 161 búsquedas en la LRU: 150 aciertos y 11 fallos. También hubo 11 inserciones, ningún desalojo y 1559 comparaciones. Durante la partida se adquirieron 138 referencias y se liberaron 133. En total, se cargaron 11 fichas mediante 3 solicitudes al catálogo. Estos datos están en docs/evidencia/2026-10-16-determinismo.json.
 
 2 - ALTERNATIVAS
-ArrayOrdenado con búsqueda binaria (usado como provisional en B2): O(log f) por búsqueda, pero crece sin tope mientras el catálogo
-descubierto crezca, y no tiene noción de protección por uso ni de desalojo. ListaLRU sobre ListaDoble propia: localizar es O(k) acotado
-por capacidad en vez de O(log f), pero incorpora la política de desalojo y el contador en_uso que el ArrayOrdenado no podía ofrecer sin
-dict. Se descarta el ArrayOrdenado para este servicio porque el requisito central de B3 no es solo resolver rápido, es resolver sin agotar
-memoria ni red cuando la cripta crece; se adopta ListaLRU con capacidad configurable (--cache-size, 25 por defecto).
+Un array ordenado permite buscar en O(log n), pero necesita mecanismos adicionales para proteger las fichas en uso y decidir cuáles retirar cuando se alcanza el límite de memoria. Una lista plana es sencilla y puede resolver las búsquedas con rapidez cuando hay pocas claves, aunque conserva todo lo que recibe si no se le agrega una política de expulsión.
+
+Elegimos ListaLRU porque reúne las tres necesidades del catálogo: dar prioridad a las fichas consultadas recientemente, controlar la capacidad y proteger las que siguen en uso. Las mediciones permiten evaluar el costo de esta decisión, aunque la LRU no sea la opción más rápida en todos los escenarios.
 
 3 - DECISIÓN
-ControladorRed._fichas pasa de ArrayOrdenado a ListaLRU(capacidad=cache_size). ficha(tipo_id) usa ListaLRU.buscar(), que mueve la entrada
-al frente en cada acierto. Al incorporar el contenido de una sala (_incorporar), cada enemigo creado marca en_uso en su ficha
-automáticamente, porque un enemigo vivo protege su ficha sin importar en qué sala esté (Sec. 4.4). ROL 4 debe llamar ControladorRed.notificar_muerte_enemigo(enemigo)
-exactamente cuando enemigo.vivo pase a False; sin esa llamada la ficha queda protegida indefinidamente.
-La protección de objetos (inventario o suelo de la sala actual) y de trampas (sala actual) queda fuera de este incremento:
-el enunciado la limita a la sala donde está parado el jugador, no a cualquier sala cargada, y esa noción de "sala actual" todavía no existe
-porque el bucle de movimiento es trabajo de ROL 4 (ver ROL3_BLOQUE3.md). Marcar esas fichas en_uso en toda sala incorporada sería incorrecto: impediría desalojar fichas de salas que el jugador ya no visita. Queda como contrato pendiente para cuando exista el movimiento.
+ControladorRed utiliza una ListaLRU construida sobre nuestra ListaDoble. Cuando buscar encuentra una ficha, mueve su nodo al frente para marcarla como la más reciente. Las fichas cuyo contador en_uso es mayor que cero quedan protegidas frente al desalojo.
 
-4 - COMPLEJIDAD ALGORÍTMICA
-Operación más frecuente: ficha(tipo_id) vía ListaLRU.buscar(). Recorrido lineal O(k) con k = capacidad de la caché (constante, no crece con el tamaño de la cripta).
-Un acierto mueve el nodo al frente en O(1) adicional. marcar_en_uso/desmarcar_en_uso también son O(k) porque localizan el nodo de la misma
-forma que buscar().
+Al morir un enemigo, el modelo notifica al controlador para que libere la referencia correspondiente. Por su parte, ControladorJuego._sincronizar_protegidas mantiene protegidas las fichas del inventario, los objetos del suelo y las trampas de la sala actual. Cuando cambia la situación del jugador, actualiza esas referencias y libera las que dejan de ser necesarias.
+
+4 - COMPLEJIDAD
+Buscar una ficha, protegerla o liberar su referencia requiere localizarla en la caché. Estas operaciones cuestan O(k), donde k es la cantidad de fichas que se recorren. Una vez encontrado el nodo, moverlo al frente cuesta O(1) adicional.
+
+Con una capacidad pequeña, el recorrido es corto. Sin embargo, al aumentar cache-size también puede aumentar el trabajo de búsqueda, por lo que no conviene tratar ese costo como constante al comparar cachés de distintos tamaños.
 
 5 - EVIDENCIA
-tests/test_catalogo_lru.py (6 casos nuevos): el catálogo es una ListaLRU real; resolver_catalogo deja la ficha disponible; una ficha
-inexistente da None; incorporar una sala marca en_uso a sus enemigos automáticamente; con capacidad 3, una ficha protegida sobrevive
-un cuarto tipo que fuerza desalojo; dos instancias del mismo tipo (sala_2 trae dos ratas gigantes) requieren notificar la muerte de
-ambas antes de liberar la ficha. Suite completa: 430 pruebas aprobadas (424 previas de B1/B2/B3 + 6 nuevas), 
-sin tocar tests/test_bloque3.py que depende de un módulo de ROL 1 (persistencia.PartidaBinaria) todavía no publicado. 
-Tabla --bench con repeticiones, mediana y equipo: pendiente B4, igual que para 4.4.
+El archivo docs/evidencia/2026-10-16-catalogo-inventario.json contiene una prueba de 1000 búsquedas sobre 40 claves distintas. La LRU tenía capacidad para 25 fichas y la secuencia de consultas se generó con semilla 42. Se realizó un calentamiento y se tomó la mediana de 5 repeticiones.
+
+La LRU obtuvo una mediana de 3.454900 ms y 617 aciertos. La lista plana obtuvo 0.420300 ms y 960 aciertos. La prueba se ejecutó en Windows 11 con Python 3.12.14 y un procesador identificado como AMD64 Family 25 Model 33 Stepping 2.
+
+La diferencia de aciertos tiene una explicación importante: la lista plana puede conservar las 40 claves, mientras que la LRU solo dispone de 25 espacios. Por eso, estos resultados muestran el comportamiento de dos estrategias distintas; no permiten comparar sus aciertos como si ambas aplicaran la misma política de memoria.
+
+La protección de fichas se verifica en tests/test_bloque3_catalogoLRU.py y en test_fichas_de_la_sala_actual_quedan_protegidas. Las pruebas del bloque 4 también comparan el estado y los mensajes de las partidas y sus replays con 10 patrones de latencia, además de comprobar la incorporación de lotes concurrentes.
 
 6 - LÍMITES
-Con cache_size menor que la cantidad de tipos distintos que trae una sola sala, resolver_catalogo puede desalojar una ficha
-antes de que _incorporar la necesite, porque el marcado en_uso ocurre después de resolver, no durante: una sala con 3 tipos
-distintos y cache_size=1 falla al incorporar (RuntimeError). Esto se descubrió probando la integración y se documenta aquí en
-vez de ocultarse subiendo el tamaño de caché de la prueba sin más: en partidas reales, --cache-size por defecto (25) es muy superior
-a los tipos distintos de una sala típica, así que no se espera que ocurra, pero el límite es real y queda sin resolver automáticamente.
-La protección de objetos y trampas por sala actual no está implementada todavía (punto 3): hasta que ROL 4 conecte el movimiento, 
-esas fichas nunca se marcan en_uso y son desalojables en cualquier momento, lo cual es seguro pero no cumple todavía el requisito completo
-de 4.4 para esos dos casos.
+La búsqueda lineal puede resultar costosa si se aumenta mucho la capacidad de la caché. También hay un límite funcional: si todas las fichas están protegidas, ninguna se puede retirar para abrir espacio sin incumplir la regla de conservar las fichas en uso.
+
+Los ensayos de latencia cubren los datos de prueba y una grilla de 25 salas. No bastan para asegurar el comportamiento ante cualquier contenido del API ni para concluir cómo se comportará el juego al escalarlo x10 o x50. Asimismo, el benchmark mide búsquedas e inserciones con datos sintéticos; sus tiempos no incluyen la latencia de Internet.
