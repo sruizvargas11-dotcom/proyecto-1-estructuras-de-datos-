@@ -95,9 +95,14 @@ def test_partida_larga_solo_20_mensajes_en_cada_pantalla(tmp_path):
     sesion = nueva_partida(DatosOffline(), "cripta-01", str(tmp_path / "cache"), semilla=3)
     sesion.partida.jugador.vida_max = sesion.partida.jugador.vida = 300
     comandos = iter(["W"] * 60 + ["Q"])
+    leidos = []
+
+    def leer(*_):
+        leidos.append(next(comandos))
+        return leidos[-1]
+
     lineas = []
-    vista = VistaConsola(leer=lambda *_: next(comandos),
-                         escribir=lambda texto="": lineas.append(texto))
+    vista = VistaConsola(leer=leer, escribir=lambda texto="": lineas.append(texto))
     por_pantalla = []
     mostrar = vista.mostrar_estado
 
@@ -110,7 +115,10 @@ def test_partida_larga_solo_20_mensajes_en_cada_pantalla(tmp_path):
     ControladorJuego(sesion, vista).jugar()
 
     assert vista._mensajes.contador_agregados >= 60    # muchos más que 20
-    assert max(por_pantalla) == 20 and len(por_pantalla) == 61
+    # Una pantalla por cada decisión (60 W + Q); mostrar_fin puede redibujar el
+    # estado una vez más al terminar, así que no se fija el total exacto.
+    assert len(leidos) == 61 and len(por_pantalla) >= len(leidos)
+    assert max(por_pantalla) == 20 and all(n <= 20 for n in por_pantalla)
     assert vista.mensajes()[-1] == "[t=5900] Esperas."
     # La pantalla final del juego tampoco muestra más de 20.
     assert len(_lineas_de_mensaje(_ultima_pantalla(lineas))) == 20
