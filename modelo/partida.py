@@ -78,6 +78,11 @@ class Partida:
         self.al_morir_enemigo = Vector()   # f(enemigo)
         self.al_entrar_sala = Vector()     # f(sala_anterior, sala_nueva)
         self.al_mensaje = Vector()         # f(tiempo, texto)
+        # Para la vista Pygame (cola de animaciones): vacíos si nadie se suscribe,
+        # no cambian el comportamiento de la consola. Los callbacks reciben
+        # referencias ya vivas, nunca ejecutan azar ni mutan el modelo.
+        self.al_mover_enemigo = Vector()   # f(enemigo, sala_origen, sala_destino)
+        self.al_atacar = Vector()          # f(atacante, objetivo, dano)
 
         # Función que aplica el efecto de un objeto: f(partida, objeto) -> bool.
         self.aplicar_efecto = None
@@ -218,6 +223,8 @@ class Partida:
             dano = self.reloj.calcular_dano(enemigo.ataque, self.jugador.defensa)
             perdida = self.jugador.recibir_dano(dano)
             self._emitir(f"{self.nombre_enemigo(enemigo)} te ataca: -{perdida} de vida.")
+            for funcion in self.al_atacar:
+                funcion(enemigo, self.jugador, perdida)
         elif accion == "mover":
             self._mover_enemigo(enemigo, objetivo)
         self.verificar_fin()
@@ -242,6 +249,8 @@ class Partida:
             self._emitir(f"{self.nombre_enemigo(enemigo)} entra en la sala.")
         elif origen is self.jugador.sala_actual:
             self._emitir(f"{self.nombre_enemigo(enemigo)} sale de la sala.")
+        for funcion in self.al_mover_enemigo:
+            funcion(enemigo, origen, destino)
 
     def danar_enemigo(self, enemigo, cantidad):
         """Aplica daño ya calculado. Si muere, procesa la muerte. Devuelve la pérdida."""
@@ -293,6 +302,8 @@ class Partida:
         dano = self.reloj.calcular_dano(self.jugador.ataque, enemigo.defensa)
         perdida = enemigo.recibir_dano(dano)
         self._emitir(f"Atacas a {self.nombre_enemigo(enemigo)}: -{perdida} de vida.")
+        for funcion in self.al_atacar:
+            funcion(self.jugador, enemigo, perdida)
         if not enemigo.vivo:
             self.registrar_muerte_enemigo(enemigo)
         return perdida

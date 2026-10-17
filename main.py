@@ -41,9 +41,13 @@ def main(argumentos=None):
     parser.add_argument('--bench', action='store_true', help='Ejecutar benchmarks')
     parser.add_argument('--offline-dir', help='Datos locales alternativos; requiere --offline')
     parser.add_argument('--partidas-dir', default='partidas', help='Guardados y bitácoras')
+    parser.add_argument('--gui', action='store_true',
+                        help='Jugar con la vista Pygame en vez de la consola')
     opciones = parser.parse_args(argumentos)
     if opciones.replay and opciones.bench:
         parser.error('--replay y --bench son modos excluyentes')
+    if opciones.gui and (opciones.replay or opciones.bench or opciones.solo_mapa):
+        parser.error('--gui no se puede combinar con --replay, --bench ni --solo-mapa')
     if opciones.offline_dir and not opciones.offline:
         parser.error('--offline-dir requiere --offline')
     if opciones.bench:
@@ -58,6 +62,8 @@ def main(argumentos=None):
         fuente = crear_fuente(args_fuente)
         if opciones.replay:
             return reproducir(fuente, opciones)
+        if opciones.gui:
+            return jugar_gui(fuente, opciones)
         cripta_id = opciones.cripta
         if cripta_id is None:
             respuesta = fuente.listar_criptas()
@@ -108,12 +114,14 @@ def jugar(fuente, cripta_id, opciones):
     semilla = generar_semilla()
     ruta_log = ruta_bitacora_por_defecto(cripta_id, semilla,
                         str(Path(opciones.partidas_dir) / 'bitacoras'))
+    vista = VistaConsola()
+    nombre_jugador = vista.pedir_nombre_jugador()
     sesion = nueva_partida(
         fuente, cripta_id, opciones.cache_dir, semilla=semilla,
         ruta_bitacora=ruta_log,
         cache_size=opciones.cache_size,
-        despachador=DespachoEnHilos() if opciones.hilos else None)
-    vista = VistaConsola()
+        despachador=DespachoEnHilos() if opciones.hilos else None,
+        nombre_jugador=nombre_jugador)
     vista.mostrar_inicio(cripta_id, semilla)
     controlador = ControladorJuego(sesion, vista,
                                     str(Path(opciones.partidas_dir) / 'partida.sav'))
@@ -127,6 +135,16 @@ def jugar(fuente, cripta_id, opciones):
     _mostrar_reporte(fuente, controlador.sesion, 'partida',
                      motivo_partida(controlador.partida.estado), opciones,
                      getattr(controlador.bitacora, 'ruta', ruta_log))
+    return 0
+
+
+def jugar_gui(fuente, opciones):
+    """Partida nueva con la vista Pygame. --replay y --bench nunca pasan por
+    aquí (regla del curso): este es el único punto que importa pygame."""
+    from vista_pygame.app import ejecutar as ejecutar_gui
+
+    ejecutar_gui(fuente, carpeta_cache=opciones.cache_dir, cache_size=opciones.cache_size,
+                partidas_dir=opciones.partidas_dir)
     return 0
 
 

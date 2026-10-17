@@ -1,0 +1,435 @@
+CRIPTA_REPORTES_RED v1 (más reciente primero; se guardan los últimos 50)
+
+=== Reporte de red #14 ===
+fecha: 2026-10-16 18:42:00
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-72\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #13 ===
+fecha: 2026-10-16 18:40:38
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-71\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #12 ===
+fecha: 2026-10-16 18:02:59
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-69\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #11 ===
+fecha: 2026-10-16 18:02:11
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-68\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #10 ===
+fecha: 2026-10-16 17:42:02
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-65\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #9 ===
+fecha: 2026-10-16 17:41:51
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-64\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #8 ===
+fecha: 2026-10-16 17:41:03
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-62\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #7 ===
+fecha: 2026-10-16 17:40:24
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-61\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #6 ===
+fecha: 2026-10-16 17:39:44
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-60\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #5 ===
+fecha: 2026-10-16 17:29:16
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-56\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #4 ===
+fecha: 2026-10-16 17:27:43
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-55\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #3 ===
+fecha: 2026-10-16 17:27:00
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-53\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #2 ===
+fecha: 2026-10-16 17:25:57
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-52\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
+=== Reporte de red #1 ===
+fecha: 2026-10-16 17:07:50
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Users\sruiz\AppData\Local\Temp\pytest-of-sruiz\pytest-50\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
