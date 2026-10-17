@@ -292,6 +292,61 @@ class VistaConsola:
             self._escribir("Partida terminada por el jugador.")
         for campo, valor in partida.resumen_puntaje():
             self._escribir(f"  {campo}: {valor}")
+    def pedir_nombre_puntaje(self):
+        """Se pide al terminar; Enter, EOF o Ctrl+C usan Anónimo."""
+        try:
+            nombre = self._leer(
+                "Nombre para la tabla [Anónimo]: "
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            return "Anónimo"
+
+        return nombre or "Anónimo"
+
+    def mostrar_error_puntaje(self, error):
+        self._escribir(f"No se pudo guardar el puntaje: {error}")
+        self._escribir(
+            "El resultado de la partida se conserva "
+            "en el resumen mostrado."
+        )
+
+    def mostrar_tabla_puntajes(
+            self, tabla, cripta_id, version_cripta, ruta):
+        self._escribir(f"Puntaje guardado en: {ruta}")
+        self._escribir(
+            f"Resultados de {cripta_id}, "
+            f"versión {version_cripta} (hasta 10):"
+        )
+
+        posicion = 0
+
+        for indice in range(len(tabla)):
+            puntaje = tabla.obtener(indice)
+
+            if (
+                puntaje.cripta_id != cripta_id
+                or puntaje.version_cripta != version_cripta
+            ):
+                continue
+
+            posicion += 1
+
+            estado = (
+                "interrumpida"
+                if puntaje.resultado == "en_curso"
+                else puntaje.resultado
+            )
+
+            self._escribir(
+                f"{posicion}. {puntaje.nombre} | {estado} | "
+                f"enemigos: {puntaje.enemigos_derrotados} | "
+                f"acciones: {puntaje.acciones_jugador} | "
+                f"tiempo: {puntaje.tiempo_final}"
+            )
+
+            if posicion == 10:
+                break
+
 
     def leer_comando(self):
         try:

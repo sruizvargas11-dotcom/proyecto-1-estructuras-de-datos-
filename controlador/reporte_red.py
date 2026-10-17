@@ -48,13 +48,13 @@ def _modo_fuente(fuente):
     return modo if isinstance(modo, str) else "http"
 
 
-def construir_reporte(fuente, sesion, modo, motivo, ahora=None, bitacora=None):
+def construir_reporte(fuente, sesion, modo, motivo, ahora=None, bitacora=None, metricas_bench=()):
     """Líneas del reporte (sin encabezado ni número). sesion puede ser None si
     la partida no llegó a crearse (por ejemplo, presupuesto agotado al cargar)."""
     ahora = ahora or datetime.now()
     lineas = Vector()
     agregar = lineas.agregarValor
-    fuente_modo = _modo_fuente(fuente)
+    fuente_modo = "sintética (sin HTTP)" if modo == "bench" else _modo_fuente(fuente)
     agregar(f"fecha: {ahora.strftime('%Y-%m-%d %H:%M:%S')}")
     agregar(f"modo: {modo}")
     agregar(f"fuente: {fuente_modo}")
@@ -83,7 +83,14 @@ def construir_reporte(fuente, sesion, modo, motivo, ahora=None, bitacora=None):
         presupuesto = _entero(getattr(fuente, "presupuesto", None)) or None
     nota = " (offline: las lecturas locales no cuentan)" if fuente_modo == "offline" else ""
     agregar(f"solicitudes_realizadas: {realizadas}{nota}")
-    if presupuesto is None:
+    if modo == "bench":
+        agregar("presupuesto_solicitudes: no aplica (ensayos locales)")
+        agregar("dentro_del_presupuesto: sí (0 solicitudes HTTP)")
+        agregar("-- Caché del ensayo ListaLRU, no de una partida --")
+        agregar(f"fichas_lru_aciertos: {_valor(metricas_bench, 'aciertos')}")
+        agregar(f"fichas_lru_fallos: {_valor(metricas_bench, 'fallos')}")
+        agregar("fichas_fallos_resueltos: 0 desde disco, 0 desde la red; inserciones sintéticas")
+    elif presupuesto is None:
         agregar("presupuesto_solicitudes: desconocido (no se llegó a leer la cripta)")
     else:
         agregar(f"presupuesto_solicitudes: {presupuesto}")
@@ -205,10 +212,10 @@ class HistorialReportesRed:
         return self._leer_bloques()
 
 
-def registrar_reporte(fuente, sesion, modo, motivo, ruta=None, bitacora=None, ahora=None):
+def registrar_reporte(fuente, sesion, modo, motivo, ruta=None, bitacora=None, ahora=None, metricas_bench=()):
     """Arma el reporte, lo apila en el historial y devuelve el texto a mostrar.
     Si el archivo no se puede escribir, el reporte igual se devuelve para pantalla."""
-    lineas = construir_reporte(fuente, sesion, modo, motivo, ahora=ahora, bitacora=bitacora)
+    lineas = construir_reporte(fuente, sesion, modo, motivo, ahora=ahora, bitacora=bitacora, metricas_bench=metricas_bench)
     historial = HistorialReportesRed(ruta)
     try:
         numero, texto = historial.agregar(lineas)

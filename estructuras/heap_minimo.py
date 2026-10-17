@@ -165,39 +165,54 @@ class HeapMinimo:
             self._hundir(0)
 
     def _flotar(self, indice):
-        """
-        Flota el elemento en la posición 'indice' hasta que quede en su lugar.
-        """
+        """Flota la entrada desplazando padres, sin intercambios repetidos."""
+        vector = self._datos
+        datos = vector._datos
+        entrada = datos[indice]
+        clave = entrada.clave()
+        accesos, asignaciones = 1, 1
         while indice > 0:
             padre = (indice - 1) // 2
+            superior = datos[padre]
+            accesos += 1
             self.contador_comparaciones += 1
-            if self._datos.obtenerValor(indice).clave() < self._datos.obtenerValor(padre).clave():
-                self._intercambiar(indice, padre)
-                indice = padre
-            else:
+            if clave >= superior.clave():
                 break
+            datos[indice] = superior
+            asignaciones += 1
+            indice = padre
+        datos[indice] = entrada
+        vector.contador_accesos += accesos
+        vector.contador_asignaciones += asignaciones
 
     def _hundir(self, indice):
-        n = len(self._datos)
-
-        while True:
-            izquierda = 2 * indice + 1
-            derecha = 2 * indice + 2
-            menor = indice
-
-            if izquierda < n:
-                self.contador_comparaciones += 1
-                if self._datos.obtenerValor(izquierda).clave() < self._datos.obtenerValor(menor).clave():
-                    menor = izquierda
-            if derecha < n:
-                self.contador_comparaciones += 1
-                if self._datos.obtenerValor(derecha).clave() < self._datos.obtenerValor(menor).clave():
-                    menor = derecha
-
-            if menor == indice:
+        # Comparar enteros evita crear una tupla por cada hijo examinado.
+        vector=self._datos
+        n=len(vector)
+        datos=vector._datos
+        entrada=datos[indice]
+        tiempo,secuencia=entrada.tiempo,entrada.secuencia
+        accesos,asignaciones=1,1
+        while 2*indice+1<n:
+            menor=2*indice+1
+            hijo=datos[menor]
+            accesos+=1
+            derecha=menor+1
+            if derecha<n:
+                otro=datos[derecha]
+                accesos+=1
+                self.contador_comparaciones+=1
+                if otro.tiempo<hijo.tiempo or (otro.tiempo==hijo.tiempo and otro.secuencia<hijo.secuencia):
+                    menor,hijo=derecha,otro
+            self.contador_comparaciones+=1
+            if tiempo<hijo.tiempo or (tiempo==hijo.tiempo and secuencia<=hijo.secuencia):
                 break
-            self._intercambiar(indice, menor)
-            indice = menor
+            datos[indice]=hijo
+            asignaciones+=1
+            indice=menor
+        datos[indice]=entrada
+        vector.contador_accesos+=accesos
+        vector.contador_asignaciones+=asignaciones
 
     def _intercambiar(self, i, j):
         temp = self._datos.obtenerValor(i)

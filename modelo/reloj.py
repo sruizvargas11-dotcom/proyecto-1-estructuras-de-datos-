@@ -1,7 +1,7 @@
 """Agenda virtual determinista; no conoce HTTP, disco ni interfaz gráfica."""
 import random
 from estructuras.heap_minimo import HeapMinimo
-from modelo.deltas import DeltaAtributos, DeltaEvento, DeltaEfecto, DeltaVelocidad
+from modelo.deltas import DeltaEvento, DeltaEfecto, DeltaVelocidad
 
 
 def entero(valor, nombre, minimo=0):
@@ -78,7 +78,6 @@ class Reloj:
         entrada = self.agenda.insertarEntrada(tiempo, evento)
         self.registrar((DeltaEfecto if efecto else DeltaEvento)(self, entrada, nueva=True))
         if campo is not None:
-            self.registrar(DeltaAtributos(dueno, campo))
             setattr(dueno, campo, entrada)
         self._sincronizar_efecto(entrada, True)
         return entrada
@@ -88,7 +87,6 @@ class Reloj:
         tiempo = self.tiempo_actual + self.intervalo(costo, actor.velocidad)
         entrada = self.programar_en(tiempo, ejecutar, tipo='accion', dueno=actor,
                                     campo='evento_actual', efecto=False)
-        self.registrar(DeltaAtributos(actor, 'tiempo_siguiente'))
         actor.tiempo_siguiente = tiempo
         return entrada
 
@@ -98,7 +96,6 @@ class Reloj:
             raise ValueError('La primera acción se programa al iniciar la partida.')
         entrada = self.programar_en(0, ejecutar, tipo='accion', dueno=actor,
                                     campo='evento_actual', efecto=False)
-        self.registrar(DeltaAtributos(actor, 'tiempo_siguiente'))
         actor.tiempo_siguiente = 0
         return entrada
 
@@ -130,7 +127,6 @@ class Reloj:
         self.agenda.invalidarEntrada(entrada)
         self._sincronizar_efecto(entrada, False)
         if evento.campo and getattr(evento.dueno, evento.campo) is entrada:
-            self.registrar(DeltaAtributos(evento.dueno, evento.campo))
             setattr(evento.dueno, evento.campo, None)
         return True
 
@@ -186,7 +182,6 @@ class Reloj:
         entrada.valido = False
         self._sincronizar_efecto(entrada, False)
         if evento.campo and getattr(evento.dueno, evento.campo) is entrada:
-            self.registrar(DeltaAtributos(evento.dueno, evento.campo))
             setattr(evento.dueno, evento.campo, None)
         self.tiempo_actual = entrada.tiempo
 
@@ -250,7 +245,7 @@ class Reloj:
             raise RuntimeError('Todavía no corresponde la decisión del actor.')
         self._retirar(entrada)
 
-    def extraer_siguiente(self):
+    def extraer_siguiente(self, entrada=None):
         """Paso 1 del bucle principal: retira el evento válido mínimo.
 
         Orden (tiempo, seq); los cancelados se descartan antes (lazy). Avanza el
@@ -261,7 +256,10 @@ class Reloj:
         """
         if self._ejecutando:
             raise RuntimeError('No se puede extraer dentro de otro evento.')
-        entrada = self.proximo()
+        if entrada is None:
+            entrada = self.proximo()
+        elif not entrada.valido or self.agenda.minimo() is not entrada:
+            raise ValueError('La entrada indicada ya no es el próximo evento.')
         if entrada is None:
             return None
         self._retirar(entrada)

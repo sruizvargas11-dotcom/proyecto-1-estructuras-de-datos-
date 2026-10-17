@@ -149,7 +149,8 @@ def test_main_registra_partida_y_replay(tmp_path, monkeypatch, capsys):
     # Enter elige la cripta, luego esperar y salir.
     monkeypatch.setattr("sys.stdin", io.StringIO("\nW\nQ\n"))
     reportes = str(tmp_path / "reportes.txt")
-    comunes = ["--offline", "--cache-dir", str(tmp_path / "cache"), "--reportes", reportes]
+    comunes = ["--offline", "--cache-dir", str(tmp_path / "cache"), "--reportes", reportes,
+               "--partidas-dir", str(tmp_path / "partidas")]
 
     assert main(comunes) == 0
     assert "=== Reporte de red #1 ===" in capsys.readouterr().out

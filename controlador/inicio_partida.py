@@ -89,7 +89,7 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     fabrica_contenido = FabricaObjetos(prefijo="objeto")
     fabrica_botin = FabricaObjetos(prefijo="botin")
     red = ControladorRed(fuente, cripta, carpeta_cache, fabrica=fabrica_contenido,
-                         cache_size=cache_size, despachador=despachador)
+                         cache_size=cache_size, despachador=despachador, completar_lotes=True)
     sala_inicial = cripta.sala_por_id(cripta.sala_inicial_id)
     # Encola primero las vecinas para incluirlas en el lote de la sala inicial.
     red.planificar_precarga(sala_inicial)

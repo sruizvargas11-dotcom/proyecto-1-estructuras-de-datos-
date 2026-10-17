@@ -127,6 +127,7 @@ def cargar(ruta, sesion_actual):
         red = ControladorRed(sesion_actual.fuente, partida.cripta,
                              sesion_actual.red._cache,
                              version_catalogo={'version': partida.version_catalogo},
+                             completar_lotes=getattr(sesion_actual.red, '_completar_lotes', True),
                              despachador=DespachoEnHilos() if isinstance(
                                  sesion_actual.red._despachador, DespachoEnHilos) else None)
         for campo in CAMPOS_RED:

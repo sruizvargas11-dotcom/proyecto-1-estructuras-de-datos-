@@ -11,7 +11,6 @@ se escriben en la carpeta temporal del sistema y se borran al terminar.
 import json
 import os
 import random
-import statistics
 import sys
 import tempfile
 import time
@@ -19,8 +18,13 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from persistencia.PartidaBinaria import PartidaBinaria
+from bench.medicion import mediana
 from estructuras.vector_dinamico import Vector
 from estructuras.ordenamientos import ordenar
+
+
+def _comparar_ids(a, b):
+    return (a > b) - (a < b)
 
 
 def _comparar_pares(a, b):
@@ -57,12 +61,13 @@ def generar_estado(num_salas):
 
 def medir(func, repeticiones=REPETICIONES):
     """Corre func() repeticiones veces y devuelve la mediana del tiempo en segundos."""
+    func()  # calentamiento excluido de las muestras
     tiempos = []
     for _ in range(repeticiones):
         inicio = time.perf_counter()
         func()
         tiempos.append(time.perf_counter() - inicio)
-    return statistics.median(tiempos)
+    return mediana(tiempos)
 
 
 def bench_tamano(num_salas, carpeta_tmp):
@@ -73,7 +78,7 @@ def bench_tamano(num_salas, carpeta_tmp):
     ids = Vector()
     for sid in estado_salas:
         ids.agregarValor(sid)
-    ordenar(ids, lambda a, b: (a > b) - (a < b))
+    ordenar(ids, _comparar_ids)
     sala_media = ids.obtenerValor(num_salas // 2)
 
     pares_salas = [(sid, datos) for sid, datos in estado_salas.items()]

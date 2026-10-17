@@ -180,7 +180,7 @@ class ControladorJuego:
 
         # 3. Turno de un enemigo
         elif evento.tipo == "accion" and isinstance(evento.dueno, Enemigo):
-            self.reloj.extraer_siguiente()
+            self.reloj.extraer_siguiente(entrada)
             self.contador_turnos_enemigo += 1
             self.partida.ejecutar_accion_enemigo(evento.dueno)
             actor = evento.dueno
@@ -190,7 +190,7 @@ class ControladorJuego:
             # No es la acción de un actor: su callback ya contiene la regla y,
             # si es recurrente, se reprograma solo.
             self.contador_efectos += 1
-            self.reloj.extraer_siguiente()
+            self.reloj.extraer_siguiente(entrada)
             vida_antes = getattr(evento.dueno, "vida", None)
             self.reloj.ejecutar_evento(entrada)
             texto = describir_evento(self.partida, evento, vida_antes)

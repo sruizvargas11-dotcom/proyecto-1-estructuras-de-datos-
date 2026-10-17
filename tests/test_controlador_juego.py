@@ -252,7 +252,11 @@ def test_salir_termina_de_forma_controlada(tmp_path):
 
 
 
-def test_movimiento_a_sala_sin_contenido_se_rechaza_sin_tiempo(tmp_path):
+def test_movimiento_a_sala_sin_contenido_se_rechaza_sin_tiempo(tmp_path, monkeypatch):
+    # Dejar una sala fuera del lote inicial para probar la espera/fallo real.
+    # Con el lote de 10 la cripta pequeña ya queda precargada por completo.
+    from controlador.controlador_red import ControladorRed
+    monkeypatch.setattr(ControladorRed, 'MAX_LOTE', 4)
     fuente = FuenteContada(DatosOffline())
     controlador, vista, sesion, ruta = _juego(tmp_path, ["N", "N", "N", "Q"], fuente=fuente)
     fuente.fallar_contenido = True          # la precarga de 4 y 6 fallará

@@ -42,12 +42,23 @@ class DeltaEvento:
         self.reloj = reloj
         self.entrada = entrada
         self.estaba_pendiente = not nueva and entrada.valido and entrada._en_heap
+        # La entrada y su referencia en el dueño cambian juntas: un solo delta.
+        evento = entrada.dato
+        self.campo = evento.campo
+        self.anterior = getattr(evento.dueno, evento.campo) if evento.campo else None
+        self.tiempo_anterior = (getattr(evento.dueno, 'tiempo_siguiente', None)
+                                if evento.campo == 'evento_actual' else None)
 
     def revertir(self):
         if self.estaba_pendiente:
             self.reloj.agenda.restaurarEntrada(self.entrada)
         else:
             self.reloj.agenda.invalidarEntrada(self.entrada)
+        # Guardados anteriores conservan deltas de atributos separados.
+        if getattr(self, 'campo', None):
+            setattr(self.entrada.dato.dueno, self.campo, self.anterior)
+        if getattr(self, 'tiempo_anterior', None) is not None:
+            self.entrada.dato.dueno.tiempo_siguiente = self.tiempo_anterior
         self.reloj._sincronizar_efecto(self.entrada, self.estaba_pendiente)
 
 

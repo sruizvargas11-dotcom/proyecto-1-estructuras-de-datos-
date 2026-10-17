@@ -14,6 +14,7 @@ def test_mediana_y_medir():
 def test_cada_caso_devuelve_filas_bien_formadas(monkeypatch):
     # tamaños pequeños para que el test sea rápido
     monkeypatch.setattr(heap, "TAMANOS", (10, 20))
+    monkeypatch.setattr(heap, "EXTRACCIONES", 40)
     monkeypatch.setattr(inventario, "TAMANOS", (5, 10))
     monkeypatch.setattr(lru, "BUSQUEDAS", 50)
     for caso in CASOS:

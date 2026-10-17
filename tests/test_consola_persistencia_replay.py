@@ -264,4 +264,4 @@ def test_bench_no_instancia_vista(tmp_path, monkeypatch):
         raise AssertionError('No instanciar VistaConsola')
     monkeypatch.setattr(VistaConsola, '__init__', prohibido)
     monkeypatch.setattr(bench.runner, 'main_bench', lambda: [])
-    assert main.main(['--bench']) == 0
+    assert main.main(['--bench', '--reportes', str(tmp_path / 'reportes.txt')]) == 0
