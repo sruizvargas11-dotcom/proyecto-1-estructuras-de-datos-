@@ -43,6 +43,15 @@ class Vector:
         self.contador_accesos += 1
         return self._datos[indice]
 
+    def almacenamiento(self):
+        """Arreglo interno para estructuras construidas sobre el Vector (el heap).
+
+        Solo para ciclos internos que ya garantizan 0 <= i < len(self): evita
+        validar el índice en cada acceso. No sobrevive a una redimensión, así que
+        se debe pedir de nuevo después de agregarValor.
+        """
+        return self._datos
+
     def asignarValor(self, indice, valor):
         """ Sobrescribe el valor en una posición que ya existe. """
         self._validar_indice(indice)

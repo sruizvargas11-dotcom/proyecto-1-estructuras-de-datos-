@@ -12,16 +12,22 @@ class GrupoDeltas:
         return len(self._deltas)
 
     def agregar(self, delta):
+        if not getattr(delta, 'excluido', False):
+            self._agregar_incluido(delta)
+
+    def _agregar_incluido(self, delta):
+        """Para quien ya comprobó que el delta no está excluido (Historial)."""
         if not callable(getattr(delta, 'revertir', None)):
             raise TypeError('El delta debe implementar revertir().')
-        if not getattr(delta, 'excluido', False):
-            self._deltas.agregarValor(delta)
+        self._deltas.agregarValor(delta)
 
     def revertir_todo(self):
-        while len(self._deltas):
+        deltas = self._deltas
+        datos = deltas.almacenamiento()   # eliminarUltimo no redimensiona
+        while len(deltas):
             # Si un delta falla, sigue disponible para diagnosticar el fallo.
-            self._deltas.obtenerValor(len(self._deltas) - 1).revertir()
-            self._deltas.eliminarUltimo()
+            datos[len(deltas) - 1].revertir()
+            deltas.eliminarUltimo()
 
 
 class Historial:
@@ -49,9 +55,10 @@ class Historial:
         self.registrar(DeltaReloj(reloj))
 
     def registrar(self, delta):
-        if not self.registrando or getattr(delta, 'excluido', False):
+        actual = self._actual
+        if actual is None or self._revirtiendo or getattr(delta, 'excluido', False):
             return False
-        self._actual.agregar(delta)
+        actual._agregar_incluido(delta)
         self.contador_deltas += 1
         return True
 

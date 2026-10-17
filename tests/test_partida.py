@@ -188,6 +188,33 @@ def test_secuencia_213_y_determinismo_por_semilla(tmp_path):
     assert resultados[0] == resultados[1]
 
 
+def test_hooks_vista_no_alteran_determinismo(tmp_path):
+    """al_mover_enemigo / al_atacar (vista_pygame, §8.4): por defecto no hacen
+    nada; suscribirlos solo para acumular en un buffer, sin tocar random() ni
+    mutar el modelo, debe dar exactamente el mismo resultado que sin ellos."""
+    def correr(con_hooks):
+        partida = _sesion(tmp_path, semilla=2026).partida
+        mensajes = []
+        partida.al_mensaje.agregarValor(lambda t, texto: mensajes.append((t, texto)))
+        buffer = []
+        if con_hooks:
+            partida.al_mover_enemigo.agregarValor(
+                lambda enemigo, origen, destino: buffer.append(('mover', enemigo.instancia_id)))
+            partida.al_atacar.agregarValor(
+                lambda atacante, objetivo, dano: buffer.append(
+                    ('atacar', atacante.instancia_id, objetivo.instancia_id, dano)))
+        _mover(partida, partida.cripta.sala_por_id(2))
+        return (partida.jugador.vida, partida.tiempo, tuple(mensajes)), buffer
+
+    (sin, buffer_sin), (con, buffer_con) = correr(False), correr(True)
+    assert sin == con
+    assert buffer_sin == []
+    # Dos ratas atacan al jugador en t=66 (ver test_secuencia_213...): el buffer
+    # debe traer exactamente esos dos ataques, en el orden del modelo.
+    assert len(buffer_con) == 2
+    assert all(evento[0] == 'atacar' and evento[2] == 'jugador' for evento in buffer_con)
+
+
 def test_retroceso_deshace_entrada_activacion_y_ataques(tmp_path):
     partida = _sesion(tmp_path, semilla=5).partida
     inicial, sala2 = partida.jugador.sala_actual, partida.cripta.sala_por_id(2)

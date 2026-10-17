@@ -10,16 +10,24 @@ from modelo import efectos
 from modelo.partida import Partida
 
 
+NOMBRE_JUGADOR_POR_DEFECTO = "Jugador"
+
+
 class SesionPartida:
     """Lo que el controlador del juego necesita después del arranque."""
 
-    def __init__(self, partida, red, fuente, bitacora=None, esqueleto_desde_cache=None):
+    def __init__(self, partida, red, fuente, bitacora=None, esqueleto_desde_cache=None,
+                 nombre_jugador=None):
         self.partida = partida
         self.red = red
         self.fuente = fuente
         self.bitacora = bitacora
         self.acciones = Vector()
         self.esqueleto_desde_cache = esqueleto_desde_cache
+        # Dato de presentación, no del modelo (no vive en Jugador): lo exige la
+        # tabla de puntajes (§2.12) y se guarda con la partida. Nunca vacío.
+        self.nombre_jugador = (nombre_jugador or NOMBRE_JUGADOR_POR_DEFECTO).strip() \
+            or NOMBRE_JUGADOR_POR_DEFECTO
 
 
 def ruta_bitacora_por_defecto(cripta_id, semilla, carpeta=None):
@@ -65,7 +73,8 @@ def _validar_jugador(generales):
 
 
 def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
-                  ruta_bitacora=None, cache_size=25, despachador=None):
+                  ruta_bitacora=None, cache_size=25, despachador=None,
+                  nombre_jugador=None):
     """Crea e inicializa una partida. Devuelve SesionPartida.
 
     semilla=None  -> partida nueva: se genera automáticamente (nunca la elige el jugador).
@@ -76,6 +85,10 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     despachador   -> None (DespachoInmediato) o DespachoEnHilos() para que la
                      precarga viaje en segundo plano; el orden sigue siendo
                      determinista gracias al buffer de reordenamiento.
+    nombre_jugador -> quién juega (consola o GUI lo piden antes de llamar aquí);
+                     no se guarda en el modelo, solo en la sesión. Si se omite,
+                     usa NOMBRE_JUGADOR_POR_DEFECTO (p. ej. para el replay, que
+                     hoy no guarda este dato en la bitácora).
     """
     semilla = generar_semilla() if semilla is None else validar_semilla(semilla)
 
@@ -89,7 +102,7 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     fabrica_contenido = FabricaObjetos(prefijo="objeto")
     fabrica_botin = FabricaObjetos(prefijo="botin")
     red = ControladorRed(fuente, cripta, carpeta_cache, fabrica=fabrica_contenido,
-                         cache_size=cache_size, despachador=despachador)
+                         cache_size=cache_size, despachador=despachador, completar_lotes=True)
     sala_inicial = cripta.sala_por_id(cripta.sala_inicial_id)
     # Encola primero las vecinas para incluirlas en el lote de la sala inicial.
     red.planificar_precarga(sala_inicial)
@@ -108,4 +121,4 @@ def nueva_partida(fuente, cripta_id, carpeta_cache=None, semilla=None,
     if ruta_bitacora is not None:
         bitacora = BitacoraPartida.partida_nueva(
             ruta_bitacora, cripta.id, cripta.version, version_catalogo, semilla)
-    return SesionPartida(partida, red, fuente, bitacora, desde_cache)
+    return SesionPartida(partida, red, fuente, bitacora, desde_cache, nombre_jugador)

@@ -122,6 +122,29 @@ def test_truncados_no_reemplazan_partida(tmp_path, recorte):
     assert firma(s.partida) == antes
 
 
+def test_nombre_jugador_persiste_y_guardado_antiguo_es_incompatible(tmp_path):
+    """§8.2 + §4.10: nombre_jugador se guarda y se recupera; un guardado con el
+    esquema anterior (sin ese campo) da un error claro, no una carga a medias."""
+    s = sesion(tmp_path)
+    s.nombre_jugador = 'Ada'
+    ruta = str(tmp_path / 'con_nombre.sav')
+    guardar(s, ruta)
+    copia = cargar(ruta, s)
+    assert copia.nombre_jugador == 'Ada'
+
+    # Simula un guardado de la versión anterior del programa: mismo contenido,
+    # pero con el esquema viejo y sin 'nombre_jugador'.
+    g, salas = PartidaBinaria(ruta).cargar_todo()
+    g['esquema_estado'] = 1
+    del g['nombre_jugador']
+    PartidaBinaria(ruta).guardar(g, salas)
+
+    antes = firma(s.partida)
+    with pytest.raises(ValueError, match='[Ee]squema'):
+        cargar(ruta, s)
+    assert firma(s.partida) == antes   # la sesión en curso no se tocó
+
+
 def test_guardado_fallido_conserva_archivo_previo(tmp_path, monkeypatch):
     s = sesion(tmp_path)
     ruta = tmp_path / 'bueno.sav'
@@ -264,4 +287,4 @@ def test_bench_no_instancia_vista(tmp_path, monkeypatch):
         raise AssertionError('No instanciar VistaConsola')
     monkeypatch.setattr(VistaConsola, '__init__', prohibido)
     monkeypatch.setattr(bench.runner, 'main_bench', lambda: [])
-    assert main.main(['--bench']) == 0
+    assert main.main(['--bench', '--reportes', str(tmp_path / 'reportes.txt')]) == 0

@@ -1,3 +1,4 @@
+
 from controlador.estado_final import lineas_estado
 from controlador.narrador_eventos import describir_evento
 from estructuras.vector_dinamico import Vector
@@ -124,7 +125,9 @@ def _nodo_inventario(jugador, numero):
 
 
 class ControladorJuego:
-    def __init__(self, sesion, vista, ruta_guardado=None):
+    def __init__(self, sesion, vista, ruta_guardado=None, tabla_puntajes=None):
+        """tabla_puntajes: TablaPuntajes donde registrar la partida al terminar en
+        victoria o derrota; None (pruebas, replay) no registra nada."""
         self.sesion = sesion
         self.partida = sesion.partida
         self.red = sesion.red
@@ -135,6 +138,10 @@ class ControladorJuego:
         self.jugador = self.partida.jugador
         self._salir = False
         self.ruta_guardado = ruta_guardado or 'partidas/partida.sav'
+        self.tabla_puntajes = tabla_puntajes
+        self.error_puntaje = None
+        self._puntaje_intentado = False
+        self.registro_puntaje = None    # RegistroPuntaje de esta partida, si se registró
         self._protegidas = Vector()     # tipo_ids marcados en_uso por el controlador
 
         self.contador_ciclos = 0
@@ -180,7 +187,7 @@ class ControladorJuego:
 
         # 3. Turno de un enemigo
         elif evento.tipo == "accion" and isinstance(evento.dueno, Enemigo):
-            self.reloj.extraer_siguiente()
+            self.reloj.extraer_siguiente(entrada)
             self.contador_turnos_enemigo += 1
             self.partida.ejecutar_accion_enemigo(evento.dueno)
             actor = evento.dueno
@@ -190,7 +197,7 @@ class ControladorJuego:
             # No es la acción de un actor: su callback ya contiene la regla y,
             # si es recurrente, se reprograma solo.
             self.contador_efectos += 1
-            self.reloj.extraer_siguiente()
+            self.reloj.extraer_siguiente(entrada)
             vida_antes = getattr(evento.dueno, "vida", None)
             self.reloj.ejecutar_evento(entrada)
             texto = describir_evento(self.partida, evento, vida_antes)
@@ -516,7 +523,29 @@ class ControladorJuego:
         if self.bitacora is not None:
             self.bitacora.cerrar()
         self.red.cerrar(5)
+        # Antes de mostrar_fin: la vista ya encuentra la tabla actualizada.
+        if completa:
+            self._registrar_puntaje()
         self.vista.mostrar_fin(self.partida)
+
+    def _registrar_puntaje(self):
+        """Agrega la partida terminada a la tabla. Un fallo de disco o un archivo
+        dañado se informa sin interrumpir el cierre."""
+        if self.tabla_puntajes is None or self._puntaje_intentado:
+            return
+        self._puntaje_intentado = True
+        try:
+            # self.sesion y no la del arranque: después de L es la sesión cargada.
+            self.registro_puntaje = self.tabla_puntajes.registrar(self.sesion)
+        except (OSError, ValueError) as error:
+            self.error_puntaje = error
+            self.vista.agregar_mensaje(self.partida.tiempo,
+                                       f'No se pudo registrar el puntaje: {error}')
+            return
+        posicion = self.tabla_puntajes.posicion(self.registro_puntaje)
+        self.vista.agregar_mensaje(
+            self.partida.tiempo,
+            f'Puntaje registrado: posición {posicion} de {len(self.tabla_puntajes)}')
 
     def contadores(self):
         return (("ciclos", self.contador_ciclos),

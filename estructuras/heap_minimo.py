@@ -109,6 +109,81 @@ class HeapMinimo:
         self.contador_reprogramaciones += 1
         return nueva
 
+    def vista_ordenada(self, n):
+        """Hasta las primeras n entradas válidas (no canceladas), en orden de
+        (tiempo, secuencia), de solo lectura: no extrae nada, no reordena ni
+        copia el heap completo, y no toca ningún contador.
+
+        Usa un heap auxiliar de índices hacia self._datos (no de los eventos en
+        sí): arranca en la raíz y, por cada índice que retira, empuja sus dos
+        hijos. Como cada índice tiene un único padre, nunca se encola dos veces,
+        así que visita como mucho unos pocos nodos más que el resultado pedido,
+        nunca el árbol entero (salvo que casi todo esté cancelado cerca de la
+        raíz, caso degenerado). Para consulta informativa (p. ej. un panel de
+        'próximos turnos'), no para el bucle principal del juego.
+        """
+        datos = self._datos.almacenamiento()
+        resultado = Vector()
+        total = len(self._datos)
+        if total == 0 or n <= 0:
+            return resultado
+
+        indices = Vector()   # heap auxiliar: índices hacia self._datos
+
+        def clave(pos_aux):
+            return datos[indices.obtenerValor(pos_aux)].clave()
+
+        def intercambiar(a, b):
+            temp = indices.obtenerValor(a)
+            indices.asignarValor(a, indices.obtenerValor(b))
+            indices.asignarValor(b, temp)
+
+        def subir(pos):
+            while pos > 0:
+                padre = (pos - 1) // 2
+                if clave(pos) < clave(padre):
+                    intercambiar(pos, padre)
+                    pos = padre
+                else:
+                    break
+
+        def bajar(pos):
+            largo = len(indices)
+            while True:
+                izquierda, derecha, menor = 2 * pos + 1, 2 * pos + 2, pos
+                if izquierda < largo and clave(izquierda) < clave(menor):
+                    menor = izquierda
+                if derecha < largo and clave(derecha) < clave(menor):
+                    menor = derecha
+                if menor == pos:
+                    break
+                intercambiar(pos, menor)
+                pos = menor
+
+        def empujar(indice_real):
+            indices.agregarValor(indice_real)
+            subir(len(indices) - 1)
+
+        def sacar():
+            intercambiar(0, len(indices) - 1)
+            indice_real = indices.eliminarUltimo()
+            if len(indices):
+                bajar(0)
+            return indice_real
+
+        empujar(0)
+        while len(indices) and len(resultado) < n:
+            indice_real = sacar()
+            entrada = datos[indice_real]
+            izquierda, derecha = 2 * indice_real + 1, 2 * indice_real + 2
+            if izquierda < total:
+                empujar(izquierda)
+            if derecha < total:
+                empujar(derecha)
+            if entrada.valido:
+                resultado.agregarValor(entrada)
+        return resultado
+
     def extraer_minimo(self):
         """Extrae el dato del próximo evento válido, o None si no queda ninguno.
 
@@ -165,39 +240,54 @@ class HeapMinimo:
             self._hundir(0)
 
     def _flotar(self, indice):
-        """
-        Flota el elemento en la posición 'indice' hasta que quede en su lugar.
-        """
+        """Flota la entrada desplazando padres, sin intercambios repetidos."""
+        vector = self._datos
+        datos = vector._datos
+        entrada = datos[indice]
+        clave = entrada.clave()
+        accesos, asignaciones = 1, 1
         while indice > 0:
             padre = (indice - 1) // 2
+            superior = datos[padre]
+            accesos += 1
             self.contador_comparaciones += 1
-            if self._datos.obtenerValor(indice).clave() < self._datos.obtenerValor(padre).clave():
-                self._intercambiar(indice, padre)
-                indice = padre
-            else:
+            if clave >= superior.clave():
                 break
+            datos[indice] = superior
+            asignaciones += 1
+            indice = padre
+        datos[indice] = entrada
+        vector.contador_accesos += accesos
+        vector.contador_asignaciones += asignaciones
 
     def _hundir(self, indice):
-        n = len(self._datos)
-
-        while True:
-            izquierda = 2 * indice + 1
-            derecha = 2 * indice + 2
-            menor = indice
-
-            if izquierda < n:
-                self.contador_comparaciones += 1
-                if self._datos.obtenerValor(izquierda).clave() < self._datos.obtenerValor(menor).clave():
-                    menor = izquierda
-            if derecha < n:
-                self.contador_comparaciones += 1
-                if self._datos.obtenerValor(derecha).clave() < self._datos.obtenerValor(menor).clave():
-                    menor = derecha
-
-            if menor == indice:
+        # Comparar enteros evita crear una tupla por cada hijo examinado.
+        vector=self._datos
+        n=len(vector)
+        datos=vector._datos
+        entrada=datos[indice]
+        tiempo,secuencia=entrada.tiempo,entrada.secuencia
+        accesos,asignaciones=1,1
+        while 2*indice+1<n:
+            menor=2*indice+1
+            hijo=datos[menor]
+            accesos+=1
+            derecha=menor+1
+            if derecha<n:
+                otro=datos[derecha]
+                accesos+=1
+                self.contador_comparaciones+=1
+                if otro.tiempo<hijo.tiempo or (otro.tiempo==hijo.tiempo and otro.secuencia<hijo.secuencia):
+                    menor,hijo=derecha,otro
+            self.contador_comparaciones+=1
+            if tiempo<hijo.tiempo or (tiempo==hijo.tiempo and secuencia<=hijo.secuencia):
                 break
-            self._intercambiar(indice, menor)
-            indice = menor
+            datos[indice]=hijo
+            asignaciones+=1
+            indice=menor
+        datos[indice]=entrada
+        vector.contador_accesos+=accesos
+        vector.contador_asignaciones+=asignaciones
 
     def _intercambiar(self, i, j):
         temp = self._datos.obtenerValor(i)

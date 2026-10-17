@@ -11,8 +11,8 @@ TAMANOS_SALAS = (50, 500, 5000)
 
 
 def _medir(n):
-    carpeta = tempfile.mkdtemp()
-    return bench_tamano(n, carpeta)
+    with tempfile.TemporaryDirectory(prefix="cripta-bench-") as carpeta:
+        return bench_tamano(n, carpeta)
 
 
 def correr():

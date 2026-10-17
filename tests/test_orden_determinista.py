@@ -251,7 +251,11 @@ def test_incorporar_contenido_no_programa_eventos_ni_gasta_secuencia(tmp_path):
 
 
 
-def test_movimiento_hacia_sala_pendiente_espera_sin_mover_el_reloj(tmp_path):
+def test_movimiento_hacia_sala_pendiente_espera_sin_mover_el_reloj(tmp_path, monkeypatch):
+    # Dejar una sala fuera del lote inicial para probar la espera/fallo real.
+    # Con el lote de 10 la cripta pequeña ya queda precargada por completo.
+    from controlador.controlador_red import ControladorRed
+    monkeypatch.setattr(ControladorRed, 'MAX_LOTE', 4)
     fuente = FuenteLenta(DatosOffline(), 7, maximo=0.0, lentas=(4,))
     sesion = nueva_partida(fuente, 'cripta-01', str(tmp_path), semilla=9,
                            despachador=DespachoEnHilos())
@@ -272,7 +276,11 @@ def test_movimiento_hacia_sala_pendiente_espera_sin_mover_el_reloj(tmp_path):
     red.cerrar(5)
 
 
-def test_movimiento_rechazado_con_mensaje_si_no_se_obtiene_contenido(tmp_path):
+def test_movimiento_rechazado_con_mensaje_si_no_se_obtiene_contenido(tmp_path, monkeypatch):
+    # Dejar una sala fuera del lote inicial para probar la espera/fallo real.
+    # Con el lote de 10 la cripta pequeña ya queda precargada por completo.
+    from controlador.controlador_red import ControladorRed
+    monkeypatch.setattr(ControladorRed, 'MAX_LOTE', 4)
     fuente = FuenteContada(DatosOffline())
     sesion = nueva_partida(fuente, 'cripta-01', str(tmp_path), semilla=9)
     partida, red = sesion.partida, sesion.red

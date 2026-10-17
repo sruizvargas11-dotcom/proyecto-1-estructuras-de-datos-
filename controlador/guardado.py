@@ -15,6 +15,10 @@ from estructuras.ordenamientos import ordenar
 CAMPOS_RED = ('_incorporadas', '_solicitadas', '_pendientes', '_encoladas',
               '_fabrica', '_fichas', '_tipos_descubiertos', '_registro')
 
+# 1: esquema original. 2: agrega 'nombre_jugador' (§2.12, §4.10) — un guardado
+# con esquema 1 ya no es compatible, para no cargar una partida sin ese dato.
+ESQUEMA_ESTADO = 2
+
 
 def _comparar_registros(a, b):
     return (a['id'] > b['id']) - (a['id'] < b['id'])
@@ -62,7 +66,8 @@ def guardar(sesion, ruta, protegidas=None, mensajes=None):
         'mensajes': mensajes,
     })
     globales = dict(partida.encabezado())
-    globales.update(esquema_estado=1, raiz=referencia, registros=[], salas=[])
+    globales.update(esquema_estado=ESQUEMA_ESTADO, nombre_jugador=sesion.nombre_jugador,
+                    raiz=referencia, registros=[], salas=[])
     grupos = ArrayOrdenado()
     for registro in registros:
         grupo = registro['grupo']
@@ -98,8 +103,11 @@ def cargar(ruta, sesion_actual):
     try:
         archivo = PartidaBinaria(ruta)
         datos = archivo.cargar_global()
-        if datos.get('esquema_estado') != 1:
-            raise ValueError('El archivo no contiene un estado de partida compatible.')
+        if datos.get('esquema_estado') != ESQUEMA_ESTADO:
+            raise ValueError(
+                f"Guardado incompatible: esquema de estado {datos.get('esquema_estado')!r}, "
+                f"se esperaba {ESQUEMA_ESTADO}. Un guardado de una versión anterior del "
+                "programa no se puede cargar.")
         actual = dict(sesion_actual.partida.encabezado())
         for campo in ('cripta_id', 'version_cripta', 'version_catalogo'):
             if datos.get(campo) != actual[campo]:
@@ -127,6 +135,7 @@ def cargar(ruta, sesion_actual):
         red = ControladorRed(sesion_actual.fuente, partida.cripta,
                              sesion_actual.red._cache,
                              version_catalogo={'version': partida.version_catalogo},
+                             completar_lotes=getattr(sesion_actual.red, '_completar_lotes', True),
                              despachador=DespachoEnHilos() if isinstance(
                                  sesion_actual.red._despachador, DespachoEnHilos) else None)
         for campo in CAMPOS_RED:
@@ -142,7 +151,8 @@ def cargar(ruta, sesion_actual):
         for campo in ('contador_aciertos', 'contador_fallos', 'contador_desalojos'):
             setattr(red._fichas, campo, getattr(sesion_actual.red._fichas, campo))
         sesion = SesionPartida(partida, red, sesion_actual.fuente,
-                               esqueleto_desde_cache=sesion_actual.esqueleto_desde_cache)
+                               esqueleto_desde_cache=sesion_actual.esqueleto_desde_cache,
+                               nombre_jugador=datos.get('nombre_jugador'))
         sesion.acciones = estado['acciones']
         sesion.protegidas = estado['protegidas']
         sesion.mensajes_guardados = estado.get('mensajes')

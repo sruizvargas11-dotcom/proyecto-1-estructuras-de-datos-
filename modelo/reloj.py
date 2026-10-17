@@ -1,13 +1,17 @@
 """Agenda virtual determinista; no conoce HTTP, disco ni interfaz gráfica."""
 import random
 from estructuras.heap_minimo import HeapMinimo
-from modelo.deltas import DeltaAtributos, DeltaEvento, DeltaEfecto, DeltaVelocidad
+from estructuras.vector_dinamico import Vector
+from modelo.deltas import DeltaEvento, DeltaEfecto, DeltaVelocidad
 
 
 def entero(valor, nombre, minimo=0):
     if type(valor) is not int or valor < minimo:
         raise ValueError(f'{nombre} debe ser un entero >= {minimo}.')
     return valor
+
+
+_FALTA = object()   # distingue "atributo ausente" de un atributo que vale None
 
 
 class Evento:
@@ -58,37 +62,44 @@ class Reloj:
 
     def programar_en(self, tiempo, ejecutar, *, tipo='efecto', dueno=None,
                      campo=None, efecto=True):
-        """Programa un instante absoluto >= ahora. Retorna el handle del heap."""
-        entero(tiempo, 'tiempo')
+        """Programa un instante absoluto >= ahora. Retorna el handle del heap.
+
+        El delta del evento conserva también el handle y tiempo del dueño.
+        """
+        if type(tiempo) is not int or tiempo < 0:
+            entero(tiempo, 'tiempo')
         if tiempo < self.tiempo_actual:
             raise ValueError('No se puede programar en el pasado.')
         if not callable(ejecutar):
             raise TypeError('El ejecutor debe ser una función que reciba el reloj.')
         if campo is not None:
-            if dueno is None or not hasattr(dueno, campo):
+            anterior = _FALTA if dueno is None else getattr(dueno, campo, _FALTA)
+            if anterior is _FALTA:
                 raise ValueError('El campo del handle debe existir en el dueño.')
-            anterior = getattr(dueno, campo)
             if anterior is not None and anterior.valido and anterior._en_heap:
                 raise ValueError('Cancela el evento anterior antes de sustituirlo.')
-        if dueno is not None and hasattr(dueno, '_reloj'):
-            if not dueno.vivo:
-                raise ValueError('No se programan eventos para actores muertos.')
-            self.vincular_actor(dueno)
+        if dueno is not None:
+            reloj_dueno = getattr(dueno, '_reloj', _FALTA)
+            if reloj_dueno is not _FALTA:
+                if not dueno.vivo:
+                    raise ValueError('No se programan eventos para actores muertos.')
+                if reloj_dueno is not self:
+                    self.vincular_actor(dueno)
         evento = Evento(ejecutar, tipo, dueno, campo, efecto)
         entrada = self.agenda.insertarEntrada(tiempo, evento)
         self.registrar((DeltaEfecto if efecto else DeltaEvento)(self, entrada, nueva=True))
         if campo is not None:
-            self.registrar(DeltaAtributos(dueno, campo))
             setattr(dueno, campo, entrada)
-        self._sincronizar_efecto(entrada, True)
+        if efecto:
+            self._sincronizar_efecto(entrada, True)
         return entrada
 
     def programar(self, actor, costo, ejecutar):
         """Programa la próxima acción a ahora + intervalo(costo, velocidad)."""
         tiempo = self.tiempo_actual + self.intervalo(costo, actor.velocidad)
+        # Un solo delta guarda handle y tiempo_siguiente: se cambian juntos.
         entrada = self.programar_en(tiempo, ejecutar, tipo='accion', dueno=actor,
                                     campo='evento_actual', efecto=False)
-        self.registrar(DeltaAtributos(actor, 'tiempo_siguiente'))
         actor.tiempo_siguiente = tiempo
         return entrada
 
@@ -98,7 +109,6 @@ class Reloj:
             raise ValueError('La primera acción se programa al iniciar la partida.')
         entrada = self.programar_en(0, ejecutar, tipo='accion', dueno=actor,
                                     campo='evento_actual', efecto=False)
-        self.registrar(DeltaAtributos(actor, 'tiempo_siguiente'))
         actor.tiempo_siguiente = 0
         return entrada
 
@@ -130,7 +140,6 @@ class Reloj:
         self.agenda.invalidarEntrada(entrada)
         self._sincronizar_efecto(entrada, False)
         if evento.campo and getattr(evento.dueno, evento.campo) is entrada:
-            self.registrar(DeltaAtributos(evento.dueno, evento.campo))
             setattr(evento.dueno, evento.campo, None)
         return True
 
@@ -172,6 +181,21 @@ class Reloj:
         self.contador_calculos_dano += 1
         return max(1, ataque + self._azar.randint(0, 4) - defensa)
 
+    def proximos_eventos(self, n):
+        """Lectura de solo lectura de los próximos n eventos pendientes (para un
+        panel informativo tipo 'próximos turnos'); no muta la agenda. Delega en
+        HeapMinimo.vista_ordenada, que ya omite las entradas canceladas, y aquí
+        se descartan además las de un dueño ya muerto. En la práctica esto casi
+        nunca filtra nada, porque Actor.morir() ya cancela los eventos
+        pendientes del actor al llamar a reloj.cancelar_actor(); el filtro es
+        defensivo, no depende de esa garantía para no exponer un actor muerto.
+        """
+        resultado = Vector()
+        for entrada in self.agenda.vista_ordenada(n):
+            if getattr(entrada.dato.dueno, 'vivo', True):
+                resultado.agregarValor(entrada)
+        return resultado
+
     def proximo(self):
         """Limpia cancelados; la consulta posterior del heap es O(1)."""
         self.agenda.descartar_cancelados()
@@ -184,9 +208,9 @@ class Reloj:
         if extraida is not entrada:
             raise RuntimeError('Se intentó retirar un evento fuera de orden.')
         entrada.valido = False
-        self._sincronizar_efecto(entrada, False)
+        if evento.efecto:
+            self._sincronizar_efecto(entrada, False)
         if evento.campo and getattr(evento.dueno, evento.campo) is entrada:
-            self.registrar(DeltaAtributos(evento.dueno, evento.campo))
             setattr(evento.dueno, evento.campo, None)
         self.tiempo_actual = entrada.tiempo
 
@@ -250,7 +274,7 @@ class Reloj:
             raise RuntimeError('Todavía no corresponde la decisión del actor.')
         self._retirar(entrada)
 
-    def extraer_siguiente(self):
+    def extraer_siguiente(self, entrada=None):
         """Paso 1 del bucle principal: retira el evento válido mínimo.
 
         Orden (tiempo, seq); los cancelados se descartan antes (lazy). Avanza el
@@ -261,7 +285,10 @@ class Reloj:
         """
         if self._ejecutando:
             raise RuntimeError('No se puede extraer dentro de otro evento.')
-        entrada = self.proximo()
+        if entrada is None:
+            entrada = self.proximo()
+        elif not entrada.valido or self.agenda.minimo() is not entrada:
+            raise ValueError('La entrada indicada ya no es el próximo evento.')
         if entrada is None:
             return None
         self._retirar(entrada)

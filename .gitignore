@@ -9,3 +9,6 @@ __pycache__/
 .pytest_cache/
 
 partidas/cache/
+
+partidas/puntajes.json
+partidas/reportes_red.txt

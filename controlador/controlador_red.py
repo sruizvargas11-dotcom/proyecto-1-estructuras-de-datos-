@@ -14,6 +14,7 @@ from persistencia.catalogo import PersistenciaCatalogo
 from persistencia.cache_json import validar_identificador
 from estructuras.lista_simple import ListaSimple
 from estructuras.cola import Cola
+from estructuras.array_ordenado import ArrayOrdenado
 from estructuras.vector_dinamico import Vector
 from estructuras.listalru import ListaLRU
 from estructuras.ordenamientos import ordenar
@@ -186,8 +187,9 @@ class ControladorRed:
     ESPERA_MAXIMA_SEGUNDOS = 120.0    # tiempo real máximo esperando una respuesta
 
     def __init__(self, fuente, cripta, carpeta_cache=None, fabrica=None,
-                 version_catalogo=None, cache_size = 25, despachador=None):
+                 version_catalogo=None, cache_size = 25, despachador=None, completar_lotes=False):
         self._fuente = fuente
+        self._completar_lotes = completar_lotes
         self._cripta = cripta
         self._cache = carpeta_cache if carpeta_cache is not None else _carpeta_cache_por_defecto()
         # Una fábrica propia para el contenido: sus ids dependen solo del orden de
@@ -689,6 +691,33 @@ class ControladorRed:
             if self.contenido_solicitado(sala_id) or _contiene(lote, sala_id):
                 continue
             lote.agregarValor(sala_id)
+        if self._completar_lotes and 0 < len(lote) < self.MAX_LOTE:
+            self._rellenar_cercanas(lote)
+
+    def _rellenar_cercanas(self, lote):
+        """Aprovecha el mismo envío con salas cercanas, hasta MAX_LOTE.
+
+        BFS conserva el orden de las salidas; nunca depende del orden HTTP.
+        La opción se activa al montar una partida. Desactivada permite medir
+        la estrategia anterior de solo dos niveles con el mismo controlador.
+        """
+        frontera = Cola()
+        vistas = ArrayOrdenado()
+        for sala_id in lote:
+            vistas.insertar(sala_id, True)
+            frontera.encolar(self._cripta.sala_por_id(sala_id))
+        while not frontera.esta_vacia() and len(lote) < self.MAX_LOTE:
+            sala = frontera.desencolar()
+            for salida in sala.salidas.recorrer_valores():
+                destino = self._destino(salida)
+                if vistas.busqueda_binaria(destino.id) is not None:
+                    continue
+                vistas.insertar(destino.id, True)
+                frontera.encolar(destino)
+                if not self.contenido_solicitado(destino.id):
+                    lote.agregarValor(destino.id)
+                    if len(lote) == self.MAX_LOTE:
+                        break
 
     def _persistencia_catalogo(self):
         if self._pers_catalogo is None:
