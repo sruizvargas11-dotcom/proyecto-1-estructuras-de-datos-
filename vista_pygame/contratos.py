@@ -170,3 +170,22 @@ class ResumenPartida:
     presupuesto_solicitudes: int
     aciertos_cache: int
     fallos_cache: int
+
+
+@dataclass
+class FilaPuntaje:
+    """Una fila de la tabla de puntajes, ya ordenada por persistencia/puntajes.py.
+
+    Datos planos copiados en el hilo de modelo: la escena puede dibujarlos sin
+    tocar la tabla real. es_actual marca el registro de la partida recién
+    terminada (como mucho una fila por tabla).
+    """
+    posicion: int                    # 1 = mejor puntaje
+    nombre_jugador: str
+    id_cripta: str
+    version_cripta: str
+    acciones_jugador: int
+    enemigos_derrotados: int
+    tiempo_final: int
+    resultado: str                   # "victoria" | "derrota"
+    es_actual: bool

@@ -121,7 +121,7 @@ python main.py --help
 | `--cache-size N` | Fijar la capacidad de la LRU del catálogo; el valor predeterminado es 25. |
 | `--cache-dir CARPETA` | Elegir dónde guardar la caché persistente. |
 | `--hilos` | Precargar salas en segundo plano durante una partida nueva. |
-| `--partidas-dir CARPETA` | Cambiar la carpeta de bitácoras y la ruta predeterminada del guardado. |
+| `--partidas-dir CARPETA` | Cambiar la carpeta de bitácoras, la ruta predeterminada del guardado y la tabla de puntajes. |
 | `--replay LOG` | Reproducir las acciones de una bitácora sin pedir comandos. |
 | `--silencioso` | Omitir el detalle de acciones durante el replay. |
 | `--reportes ARCHIVO` | Cambiar el archivo del historial de reportes de red. |
@@ -209,7 +209,7 @@ datos_offline/
 
 La caché persistente se guarda por defecto en `partidas/cache/`. Las versiones de cripta y catálogo determinan si se puede reutilizar. En memoria, la LRU conserva las fichas consultadas recientemente y protege las que están en uso. Si todas las entradas están protegidas, no se puede liberar espacio retirando una de ellas.
 
-`--partidas-dir` cambia la ubicación de guardados y bitácoras. Para mover también la caché y los reportes, usa explícitamente `--cache-dir` y `--reportes`.
+`--partidas-dir` cambia la ubicación de guardados, bitácoras y la tabla de puntajes. Para mover también la caché y los reportes, usa explícitamente `--cache-dir` y `--reportes`.
 
 ### Descargar y comparar datos
 
@@ -221,6 +221,19 @@ python -m herramientas.comparar_online_offline cripta-01
 ```
 
 La descarga escribe o actualiza los archivos correspondientes en `datos_offline/`. La comparación revisa los datos locales frente al servicio e informa de las diferencias. `verificar.py` sirve como diagnóstico manual del acceso al API; no forma parte de la suite offline.
+
+### Tabla de puntajes
+
+Cuando una partida termina en victoria o derrota, [puntajes.py](persistencia/puntajes.py) la registra en `partidas/puntajes.json` con el nombre del jugador, el id y la versión de la cripta, las acciones del jugador, los enemigos derrotados, el tiempo final del reloj virtual y el resultado. Salir sin terminar no registra puntaje, y el replay tampoco. El registro ocurre en `ControladorJuego`, así que funciona igual en consola y en Pygame. En Pygame, `ControladorPygame.tabla_puntajes()` entrega las filas ya ordenadas, con la partida recién terminada marcada.
+
+La tabla se mantiene ordenada en un `Vector`:
+
+1. Las victorias van antes que las derrotas.
+2. Más enemigos derrotados va antes.
+3. Entre victorias, gana el menor tiempo final; entre derrotas, el mayor (sobrevivió más).
+4. Con lo anterior empatado, gana el que usó menos acciones. En un empate total queda primero el registro más antiguo.
+
+Cada registro nuevo se agrega al final y se ordena con InsertionSort. Como el resto de la tabla ya está ordenado, solo el nuevo puede estar fuera de lugar, así que el costo es O(n). Si el archivo de puntajes está dañado, se informa y no se sobrescribe.
 
 ### Reporte de red
 
@@ -239,7 +252,7 @@ main.py
 ├── modelo/         Mundo, entidades, reloj, efectos e historial
 ├── estructuras/    Implementaciones propias de los tipos de datos
 ├── adaptadores/    Fuentes HTTP, offline y con latencia simulada
-├── persistencia/   Caché versionada y formato binario de partida
+├── persistencia/   Caché versionada, formato binario de partida y tabla de puntajes
 ├── bench/          Casos de medición y calibración del ordenamiento
 ├── herramientas/   Descarga, comparación y ensayos reproducibles
 ├── tests/          Pruebas unitarias, de integración y de regresión
@@ -260,7 +273,7 @@ main.py
 | Array ordenado | Índices de claves y posiciones, incluido el guardado. |
 | Heap mínimo | Agenda de eventos ordenada por tiempo y secuencia. |
 | Lista LRU | Fichas del catálogo con protección por referencias activas. |
-| InsertionSort y MergeSort | Ordenamiento de vectores e inventario. |
+| InsertionSort y MergeSort | Ordenamiento de vectores e inventario; InsertionSort en la tabla de puntajes. |
 
 Las estructuras son implementaciones propias. Las listas de Python se usan como almacenamiento cuando corresponde; los diccionarios de transporte JSON no sustituyen a los TDAs. Los ordenamientos del proyecto no delegan en `sorted()` ni `list.sort()`, y la agenda no utiliza `heapq`.
 
@@ -369,7 +382,7 @@ Quedan aspectos del cierre del plan que deben validarse o integrarse con el equi
 - Probar una partida completa y los casos borde con una cripta desconocida del servicio. La validación local no equivale a esa prueba.
 - Completar la medición integral del ciclo y del escalado x1, x10 y x50. Los benchmarks actuales no demuestran por sí solos que el máximo de cada ciclo sea menor de 20 ms.
 - Integrar el reporte final de red en `--bench`.
-- Completar la tabla persistente de puntajes. Actualmente se muestra el resumen de la partida, pero no hay una tabla de clasificación guardada.
+- Mostrar la tabla de puntajes. Las partidas ya se registran y ordenan en `partidas/puntajes.json`, y Pygame ya puede leerlas con `tabla_puntajes()`, pero ninguna pantalla las dibuja todavía.
 - Revisar y consolidar entre los roles las secciones del Documento de Decisiones.
 
 La calibración de ordenamiento llega hasta 500 elementos y no cubre comparadores costosos. Los tiempos publicados corresponden al equipo de la medición. El entorno probado es Windows 11 con Python 3.12.14; las instrucciones para otros sistemas no representan una validación adicional de la suite en ellos.

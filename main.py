@@ -40,7 +40,8 @@ def main(argumentos=None):
                         help='Historial de reportes de red (por defecto partidas/reportes_red.txt)')
     parser.add_argument('--bench', action='store_true', help='Ejecutar benchmarks')
     parser.add_argument('--offline-dir', help='Datos locales alternativos; requiere --offline')
-    parser.add_argument('--partidas-dir', default='partidas', help='Guardados y bitácoras')
+    parser.add_argument('--partidas-dir', default='partidas',
+                        help='Guardados, bitácoras y tabla de puntajes')
     parser.add_argument('--gui', action='store_true',
                         help='Jugar con la vista Pygame en vez de la consola')
     opciones = parser.parse_args(argumentos)
@@ -109,6 +110,7 @@ def jugar(fuente, cripta_id, opciones):
     from controlador.despacho_red import DespachoEnHilos
     from controlador.inicio_partida import nueva_partida, ruta_bitacora_por_defecto
     from controlador.semilla import generar_semilla
+    from persistencia.puntajes import TablaPuntajes
     from vista.vista_consola import VistaConsola
 
     semilla = generar_semilla()
@@ -124,7 +126,9 @@ def jugar(fuente, cripta_id, opciones):
         nombre_jugador=nombre_jugador)
     vista.mostrar_inicio(cripta_id, semilla)
     controlador = ControladorJuego(sesion, vista,
-                                    str(Path(opciones.partidas_dir) / 'partida.sav'))
+                                    str(Path(opciones.partidas_dir) / 'partida.sav'),
+                                    TablaPuntajes(str(Path(opciones.partidas_dir)
+                                                      / 'puntajes.json')))
     try:
         controlador.jugar()
     except Exception as error:

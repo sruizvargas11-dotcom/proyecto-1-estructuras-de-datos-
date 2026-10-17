@@ -31,7 +31,8 @@ from controlador.inicio_partida import nueva_partida, ruta_bitacora_por_defecto
 from controlador.reporte_red import construir_reporte, motivo_error, motivo_partida
 from controlador.semilla import generar_semilla
 from estructuras.array_circular import ArrayCircular
-from vista_pygame.contratos import ResumenPartida
+from persistencia.puntajes import ErrorTablaPuntajes, TablaPuntajes
+from vista_pygame.contratos import FilaPuntaje, ResumenPartida
 
 CAPACIDAD_MENSAJES = 20
 
@@ -254,6 +255,10 @@ class ControladorPygame:
         self._panel_inventario = None
         self._panel_objeto = None
         self._resumen_fin = None
+        # La tabla real solo la toca el hilo de modelo (ControladorJuego la
+        # actualiza en _cerrar). Hacia pygame se publica una copia en filas.
+        self._tabla = TablaPuntajes(str(Path(partidas_dir) / "puntajes.json"))
+        self._filas_puntajes = None
         self._error = None
         self._esperando = False
 
@@ -286,7 +291,8 @@ class ControladorPygame:
         self.sesion.partida.al_atacar.agregarValor(self._on_atacar)
         self._leer_topologia()
         self._controlador = ControladorJuego(
-            self.sesion, self, str(Path(self._partidas_dir) / "partida.sav"))
+            self.sesion, self, str(Path(self._partidas_dir) / "partida.sav"),
+            tabla_puntajes=self._tabla)
         self._hilo = threading.Thread(target=self._correr, name="cripta-modelo", daemon=True)
         self._hilo.start()
 
@@ -382,8 +388,41 @@ class ControladorPygame:
         return self._resumen_fin
 
     def tabla_puntajes(self):
-        """Sin tabla persistente en esta migración (ver ANALISIS_ARQUITECTURA.md §8.1)."""
-        return []
+        """Lista de FilaPuntaje, de la mejor a la peor.
+
+        Después de una partida terminada en victoria o derrota trae la tabla ya
+        actualizada, con esa partida marcada (es_actual); se publica antes que
+        resumen_fin(), así que cuando la escena ve el resumen la tabla ya está.
+        Antes de la primera partida se lee una vez del archivo. Si el archivo no
+        existe o está dañado, devuelve una lista vacía.
+        """
+        with self._lock:
+            filas = self._filas_puntajes
+        if filas is None:
+            # El archivo se reemplaza de forma atómica al guardar, así que leerlo
+            # desde este hilo es seguro aunque el de modelo esté escribiendo.
+            try:
+                leidas = self._filas_desde(TablaPuntajes(self._tabla.ruta).cargar(), None)
+            except (OSError, ErrorTablaPuntajes):
+                leidas = []
+            with self._lock:
+                if self._filas_puntajes is None:
+                    self._filas_puntajes = leidas
+                filas = self._filas_puntajes
+        return list(filas)
+
+    @staticmethod
+    def _filas_desde(tabla, actual):
+        filas = []
+        for posicion, registro in enumerate(tabla, 1):
+            filas.append(FilaPuntaje(
+                posicion=posicion, nombre_jugador=registro.nombre_jugador,
+                id_cripta=registro.cripta_id, version_cripta=registro.version_cripta,
+                acciones_jugador=registro.acciones_jugador,
+                enemigos_derrotados=registro.enemigos_derrotados,
+                tiempo_final=registro.tiempo_final, resultado=registro.resultado,
+                es_actual=registro is actual))
+        return filas
 
     def reporte_red(self):
         if self.sesion is None:
@@ -431,6 +470,13 @@ class ControladorPygame:
             self._panel_objeto = None if nodo is None else nodo.valor.instancia_id
 
     def mostrar_fin(self, partida):
+        # Hilo de modelo, justo después de que ControladorJuego registró el
+        # puntaje: se copia la tabla antes de publicar el resumen.
+        registro = getattr(self._controlador, "registro_puntaje", None)
+        if registro is not None:
+            filas = self._filas_desde(self._tabla, registro)
+            with self._lock:
+                self._filas_puntajes = filas
         red = self.sesion.red
         cache = dict(red.estadisticas_cache())
         self._resumen_fin = ResumenPartida(
