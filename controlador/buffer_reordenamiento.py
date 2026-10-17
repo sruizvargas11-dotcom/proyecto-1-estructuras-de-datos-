@@ -23,7 +23,7 @@ class BufferReordenamiento:
         self._siguiente = 1       # próximo número a entregar al modelo
         self._proximo_numero = 1  # próximo número a asignar
         self._condicion = threading.Condition()
-        # contadores (documento, punto 1)
+        # Métricas de entrega e incorporación de respuestas.
         self.contador_reservas = 0
         self.contador_entregas = 0
         self.contador_adelantadas = 0   # llegaron antes que una anterior

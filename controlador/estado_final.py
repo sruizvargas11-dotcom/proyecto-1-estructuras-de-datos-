@@ -23,7 +23,7 @@ def _siguiente_azar(reloj):
 
 def lineas_estado(partida):
     """Estado observable de la partida como líneas de texto en orden fijo
-    (salas por id). Dos partidas coinciden si y solo si coinciden sus líneas."""
+    (salas por id). Compara estos campos observables; no serializa todos los internos."""
     jugador = partida.jugador
     lineas = Vector()
     agregar = lineas.agregarValor

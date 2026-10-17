@@ -71,8 +71,8 @@ class Actor:
         self._reloj = None
         self.eventos_efectos = ListaDoble()
 
-        # Slots de efectos temporales (rol 2, Sec. 2.10): handles propios para
-        # que programar_en los gestione con su mecanismo de campo habitual.
+        # Referencias a los eventos de cada efecto, usadas para cancelarlos
+        # o reprogramarlos sin recorrer la agenda completa.
         self.evento_veneno = None
         self.estado_veneno = None
         self.evento_mod_velocidad = None

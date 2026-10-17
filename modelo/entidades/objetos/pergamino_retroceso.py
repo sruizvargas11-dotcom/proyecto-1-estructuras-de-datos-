@@ -1,4 +1,4 @@
-"""Objeto consumible que permitirá activar el retroceso de una acción."""
+"""Consumible que permite deshacer el último intervalo de acciones."""
 
 from modelo.entidades.objetos.objeto import Objeto
 

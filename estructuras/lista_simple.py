@@ -32,7 +32,6 @@ class ListaSimple:
         return self._tamano == 0
 
 
-    """CORRECCION DE NODOS"""
 
     def insertar_al_inicio(self, valor):
         """O(1): El nuevo nodo pasa a ser la cabeza directamente. """
@@ -44,8 +43,7 @@ class ListaSimple:
         return nodo
 
     def eliminar_valor(self, valor):
-        """Quita la primera ocurrencia del valor. O(N): hay que recorrer buscando, porque no se
-        conoce en dónde está."""
+        """Elimina la primera coincidencia. Recorre la lista en O(n)."""
         self.contador_intentos_eliminacion += 1
         anterior = None
         actual = self._head

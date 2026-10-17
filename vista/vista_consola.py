@@ -15,6 +15,8 @@ AYUDA = """Comandos (no distingue mayúsculas; [n] es opcional y vale 1 por defe
   T [n]                  soltar objeto n del inventario ...... 25
   P                      pergamino de retroceso ......... sin tiempo
   I [peso|valor|nombre]  inventario: orden real u ordenado  sin tiempo
+  IS / IA / IC           siguiente / anterior / consultar objeto
+  G [ruta]               guardar partida    L [ruta] cargar partida
   H                      esta ayuda                    Q   salir
 """
 
@@ -86,28 +88,30 @@ class VistaConsola:
         return self._mensajes.listar_en_orden()
 
 
-    def elegir_cripta(self, criptas):
-        """Lista las criptas (dicts con id y nombre) y devuelve el id elegido.
+    def restaurar_mensajes(self, mensajes):
+        self._mensajes = ArrayCircular(CAPACIDAD_MENSAJES)
+        for mensaje in mensajes:
+            self._mensajes.agregarValor(mensaje)
+        self._panel = Vector()
 
-        Se acepta el número de la lista o el id; Enter elige la primera.
-        """
-        e = self._escribir
-        e("Criptas disponibles:")
+    def elegir_cripta(self, criptas):
+        """Lee un número o id; Q, EOF y Ctrl+C cancelan el arranque."""
+        self._escribir("Criptas disponibles:")
         for i, cripta in enumerate(criptas, 1):
-            e(f"  {i}. {cripta['id']}: {cripta['nombre']}")
+            self._escribir(f"  {i}. {cripta['id']}: {cripta['nombre']}")
         while True:
             try:
-                texto = self._leer("Elige una cripta [1]: ").strip()
-            except EOFError:
-                texto = ""
-            if texto == "":
+                texto = self._leer("Elige una cripta [1; Q para salir]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return None
+            if texto.upper() == "Q":
+                return None
+            if not texto:
                 return criptas[0]["id"]
-            if texto.isdigit() and 1 <= int(texto) <= len(criptas):
-                return criptas[int(texto) - 1]["id"]
-            for cripta in criptas:
-                if cripta["id"] == texto:
-                    return texto
-            e("Opción inválida: escribe el número o el id de la cripta.")
+            for i, cripta in enumerate(criptas, 1):
+                if texto in (str(i), cripta["id"]):
+                    return cripta["id"]
+            self._escribir("Opción inválida: escribe el número o el id de la cripta.")
 
     def mostrar_inicio(self, cripta_id, semilla):
         self._escribir(f"Partida en {cripta_id} | semilla {semilla} | H para ver los comandos")
@@ -252,12 +256,14 @@ class VistaConsola:
         else:
             panel.agregarValor("   #  " + "Nombre".ljust(24) + "Peso".rjust(6)
                                + "Valor".rjust(7) + "  Detalle")
-        for i, objeto in enumerate(objetos, 1):
+        for objeto in objetos:
+            i = next(numero for numero, nodo in enumerate(
+                jugador.inventario.recorrer_desde_frente(), 1) if nodo.valor is objeto)
             panel.agregarValor(f"  {str(i).rjust(2)}  " + objeto.nombre[:24].ljust(24)
                                + str(objeto.peso).rjust(6) + str(objeto.valor).rjust(7)
                                + "  " + describir_objeto(objeto) + self._marca(jugador, objeto))
         if criterio is not None and len(objetos):
-            panel.agregarValor("  (los números de U/EQ/T siguen el orden real; usa I sin criterio)")
+            panel.agregarValor("  (los números mostrados corresponden a U/EQ/T en el orden real)")
         self._panel = panel
 
     def mostrar_ayuda(self):
@@ -267,27 +273,33 @@ class VistaConsola:
         self._panel = panel
 
 
-    def mostrar_fin(self, partida):
-        e = self._escribir
-        e("")
-        e("=" * ANCHO)
-        if partida.estado == "victoria":
-            e(" ¡Victoria! Escapaste de la cripta.")
-        elif partida.estado == "derrota":
-            e(" Derrota: has muerto en la cripta.")
+    def mostrar_objeto(self, nodo):
+        if nodo is None:
+            self._escribir('Inventario vacío.')
         else:
-            e(" Partida terminada por el jugador.")
-        e("=" * ANCHO)
-        e(" Últimos mensajes:")
-        for linea in self.mensajes():
-            e("   " + linea)
-        e(" Resumen:")
-        for campo, valor in partida.resumen_puntaje():
-            e(f"   {campo}: {valor}")
+            o = nodo.valor
+            self._escribir(f'Selección: {o.nombre} ({o.instancia_id}), '
+                           f'peso {o.peso}, valor {o.valor}.')
 
+    def mostrar_fin(self, partida):
+        self.mostrar_estado(partida)
+        self._escribir("")
+        if partida.estado == "victoria":
+            self._escribir("¡Victoria! Escapaste de la cripta.")
+        elif partida.estado == "derrota":
+            self._escribir("Derrota: has muerto en la cripta.")
+        else:
+            self._escribir("Partida terminada por el jugador.")
+        for campo, valor in partida.resumen_puntaje():
+            self._escribir(f"  {campo}: {valor}")
 
     def leer_comando(self):
         try:
             return self._leer("> ")
         except (EOFError, KeyboardInterrupt):
             return "Q"
+
+
+def informar(texto):
+    """Salida de arranque/diagnóstico, sin crear una vista interactiva."""
+    print(texto)

@@ -9,7 +9,7 @@ ESTADO    = "= "    # prefijo de cada línea del estado final
 CAMPOS    = ("cripta_id", "version_cripta", "version_catalogo", "semilla")
 
 
-class ErrorVersionIncompatible(Exception):
+class ErrorVersionIncompatible(ValueError):
     pass
 
 
@@ -79,7 +79,7 @@ class BitacoraPartida:
         self._archivo.flush()
 
     def registrar_cierre(self, tiempo: int, estado: str, lineas_estado):
-        """Línea 'fin' y debajo el estado final completo; el replay lo compara."""
+        """Registra el cierre y las líneas del estado observable que compara el replay."""
         self.registrar(tiempo, f"{CIERRE} {estado}")
         for linea in lineas_estado:
             self._archivo.write(f"{ESTADO}{linea}\n")
@@ -115,7 +115,7 @@ class BitacoraPartida:
     @staticmethod
     def _partir(linea):
         prefijo, _, accion = linea.partition(" ")
-        if not prefijo.startswith("t=") or not prefijo[2:].isdigit():
+        if not prefijo.startswith("t=") or not prefijo[2:].isdigit() or not accion:
             raise ValueError(f"Línea de bitácora inválida: '{linea}'")
         return int(prefijo[2:]), accion
 

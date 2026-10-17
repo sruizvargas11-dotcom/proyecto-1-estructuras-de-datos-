@@ -3,7 +3,9 @@
 Corre con pytest sobre carpetas temporales; no toca archivos del repositorio.
 """
 
+import ast
 import os
+import random
 
 import pytest
 
@@ -150,11 +152,20 @@ def _estado_global_ejemplo():
 
 
 def _estado_salas_ejemplo():
-    return {
-        1: {"sala": 1, "enemigos": [], "objetos": ["daga_oxidada"], "trampas": []},
-        2: {"sala": 2, "enemigos": ["rata_gigante"], "objetos": [], "trampas": ["pozo"]},
-        5: {"sala": 5, "enemigos": [], "objetos": [], "trampas": []},
-    }
+    """Pares (sala_id, datos) ya en orden, para las pruebas que no
+    necesitan ejercitar el ordenamiento."""
+    return [
+        (1, {"sala": 1, "enemigos": [], "objetos": ["daga_oxidada"], "trampas": []}),
+        (2, {"sala": 2, "enemigos": ["rata_gigante"], "objetos": [], "trampas": ["pozo"]}),
+        (5, {"sala": 5, "enemigos": [], "objetos": [], "trampas": []}),
+    ]
+
+
+def _datos_por_id(salas, sala_id):
+    for sid, datos in salas:
+        if sid == sala_id:
+            return datos
+    raise KeyError(sala_id)
 
 
 class TestGuardarYCargarTodo:
@@ -173,11 +184,36 @@ class TestGuardarYCargarTodo:
 
     def test_guardar_con_cero_salas_no_lanza_excepcion(self, ruta_binaria):
         partida = PartidaBinaria(ruta_binaria)
-        partida.guardar(_estado_global_ejemplo(), {})
+        partida.guardar(_estado_global_ejemplo(), [])
 
         global_cargado, salas_cargado = partida.cargar_todo()
         assert global_cargado == _estado_global_ejemplo()
-        assert salas_cargado == {}
+        assert salas_cargado == []
+
+    def test_guardar_con_pares_desordenados_cargar_todo_los_devuelve_ordenados(self, ruta_binaria):
+        salas_desordenadas = [
+            (5, {"sala": 5}),
+            (1, {"sala": 1}),
+            (2, {"sala": 2}),
+        ]
+
+        partida = PartidaBinaria(ruta_binaria)
+        partida.guardar(_estado_global_ejemplo(), salas_desordenadas)
+
+        _, salas_cargado = partida.cargar_todo()
+
+        assert salas_cargado == [(1, {"sala": 1}), (2, {"sala": 2}), (5, {"sala": 5})]
+
+    def test_guardar_con_sala_id_repetido_lanza_valueerror(self, ruta_binaria):
+        salas_repetidas = [
+            (1, {"sala": 1}),
+            (2, {"sala": 2}),
+            (1, {"sala": 1, "otra_version": True}),
+        ]
+
+        partida = PartidaBinaria(ruta_binaria)
+        with pytest.raises(ValueError):
+            partida.guardar(_estado_global_ejemplo(), salas_repetidas)
 
 
 class TestCargarGlobal:
@@ -197,13 +233,72 @@ class TestCargarSalaBinaria:
         partida = PartidaBinaria(ruta_binaria)
         partida.guardar(_estado_global_ejemplo(), salas)
 
-        assert partida.cargar_sala_binaria(2) == salas[2]
+        assert partida.cargar_sala_binaria(2) == _datos_por_id(salas, 2)
+
+    def test_sala_intermedia_desordenada_al_guardar_devuelve_la_correcta(self, ruta_binaria):
+        salas_desordenadas = [
+            (40, {"sala": 40}),
+            (10, {"sala": 10}),
+            (30, {"sala": 30}),
+            (20, {"sala": 20}),
+        ]
+
+        partida = PartidaBinaria(ruta_binaria)
+        partida.guardar(_estado_global_ejemplo(), salas_desordenadas)
+
+        assert partida.cargar_sala_binaria(30) == {"sala": 30}
+        assert partida.cargar_sala_binaria(10) == {"sala": 10}
 
     def test_sala_inexistente_devuelve_none(self, ruta_binaria):
         partida = PartidaBinaria(ruta_binaria)
         partida.guardar(_estado_global_ejemplo(), _estado_salas_ejemplo())
 
         assert partida.cargar_sala_binaria(999) is None
+
+    def test_busqueda_binaria_en_disco_con_200_salas_desordenadas(self, ruta_binaria):
+        """Comprueba la búsqueda en disco con un índice grande guardado fuera de orden.
+
+        Consulta salas de los extremos y del medio para cubrir los límites
+        de la búsqueda binaria.
+        """
+        rnd = random.Random(7)
+        ids = list(range(200))
+        rnd.shuffle(ids)
+        salas_desordenadas = [(sid, {"sala": sid}) for sid in ids]
+
+        partida = PartidaBinaria(ruta_binaria)
+        partida.guardar(_estado_global_ejemplo(), salas_desordenadas)
+
+        assert partida.cargar_sala_binaria(0) == {"sala": 0}
+        assert partida.cargar_sala_binaria(100) == {"sala": 100}
+        assert partida.cargar_sala_binaria(199) == {"sala": 199}
+        assert partida.cargar_sala_binaria(999) is None
+
+
+class TestSinOrdenamientosProhibidos:
+
+    def test_persistencia_partida_binaria_no_usa_sorted_ni_sort(self):
+        """§4.9: sorted()/list.sort() no se permiten en los ordenamientos
+        evaluados; el índice del archivo de guardado es uno de esos
+        contextos. Se verifica estáticamente con ast, no por inspección
+        manual, para que no se reintroduzca por accidente."""
+        ruta_modulo = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "persistencia", "PartidaBinaria.py",
+        )
+        with open(ruta_modulo, "r", encoding="utf-8") as f:
+            arbol = ast.parse(f.read(), filename=ruta_modulo)
+
+        llamadas_prohibidas = []
+        for nodo in ast.walk(arbol):
+            if isinstance(nodo, ast.Call):
+                funcion = nodo.func
+                if isinstance(funcion, ast.Name) and funcion.id == "sorted":
+                    llamadas_prohibidas.append("sorted()")
+                elif isinstance(funcion, ast.Attribute) and funcion.attr == "sort":
+                    llamadas_prohibidas.append(".sort()")
+
+        assert llamadas_prohibidas == []
 
 
 class TestEncabezadoInvalido:

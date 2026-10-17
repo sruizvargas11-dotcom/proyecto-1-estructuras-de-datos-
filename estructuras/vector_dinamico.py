@@ -1,10 +1,8 @@
-"""
-Vector dinámico propio: básicamente un array con redimensión al doble [ajustar tamaño].
+"""Vector con capacidad dinámica sobre una lista de almacenamiento.
 
-Usa una lista de Python únicamente como almacenamiento contiguo de bajo nivel, permitido específicamente en: 7. Restricciones de implementación
-'Sí se permite list como almacenamiento contiguo de bajo nivel, además de struct, json, requests y bibliotecas
-de interfaz.'
-La clase por sí sola decide cuándo y cuánto crecer, no python.
+La clase controla el tamaño y duplica la capacidad cuando se llena.
+La lista de Python se utiliza como almacenamiento contiguo, según
+las restricciones del proyecto.
 """
 
 class Vector:
@@ -12,7 +10,7 @@ class Vector:
 
     def __init__(self):
         self._datos = [None] * self.CAPACIDAD_INICIAL
-        self._tamano = 0 # -> tamaño real del vector
+        self._tamano = 0 # Cantidad de elementos ocupados; puede ser menor que la capacidad.
         self._capacidad = self.CAPACIDAD_INICIAL
 
         # contadores de operaciones
@@ -67,11 +65,11 @@ class Vector:
             self.contador_elementos_recorridos += 1
             yield self._datos[i]
 
-    # agregar esto a vector_dinamico.py
     def eliminarUltimo(self):
-        """Quita y devuelve el ultimo elemento. O(1), nunca reduce la
-            capacidad reservada (solo el Vector decide cuando redimensionar
-            hacia abajo, y aqui optamos por no hacerlo: ver nota mas abajo)."""
+        """Quita y devuelve el último elemento en O(1).
+
+        Conserva la capacidad reservada para poder reutilizarla al agregar elementos.
+        """
         if self._tamano == 0:
             raise IndexError("no se puede eliminar de un Vector vacio")
         self._tamano -= 1
@@ -80,7 +78,6 @@ class Vector:
         self.contador_eliminaciones += 1
         return valor
 
-    """CORRECCION DE REDIMENSION"""
     def _redimensionarVector(self, nueva_capacidad):
         datos_nuevos = [None] * nueva_capacidad
 
@@ -88,7 +85,7 @@ class Vector:
         for i in range(self._tamano):
             datos_nuevos[i] = self._datos[i]
 
-        # Estas instrucciones se ejecutan una sola vez, después del ciclo.
+        # Sustituye el almacenamiento cuando todos los elementos están copiados.
         self._datos = datos_nuevos
         self._capacidad = nueva_capacidad
         self.contador_redimensiones += 1

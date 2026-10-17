@@ -1,11 +1,7 @@
-"""
-Array ordenado de pares (clave, valor), mantenido siempre ordenado por
-clave. Permite busqueda_binaria() en O(log n). Se usa como indice del
-archivo de guardado: clave=id_sala, valor=offset de bytes dentro del
-archivo (Sec. 4.10), para saltar directo a una sala sin leer todo el
-archivo secuencialmente.
+"""Índice de pares (clave, valor) ordenados sobre nuestro Vector.
 
-Se construye sobre el vector propio.
+Se usa para relacionar cada sala con su posición en el archivo de guardado.
+La búsqueda binaria localiza una clave en O(log n).
 """
 
 from estructuras.vector_dinamico import Vector
@@ -26,12 +22,12 @@ class ArrayOrdenado:
         return len(self._datos)
 
     def insertar(self, clave, valor):
-        """O(n): encuentra la posicion correcta con busqueda binaria
-        (O(log n)) pero insertar en el medio de un arreglo exige
-        desplazar los elementos siguientes, que es O(n). Esta es la
-        razon por la que esta estructura conviene cuando se inserta
-        pocas veces y se busca muchas (justo el patron del indice de
-        guardado: se escribe una vez por partida, se busca muchas)."""
+        """Inserta o actualiza un par conservando el orden de las claves.
+
+        La posición se busca en O(log n), pero abrir espacio requiere desplazar
+        elementos y cuesta O(n). Resulta útil para índices con más consultas
+        que modificaciones.
+        """
 
         posicion = self._encontrar_posicion_de_insercion(clave)
 

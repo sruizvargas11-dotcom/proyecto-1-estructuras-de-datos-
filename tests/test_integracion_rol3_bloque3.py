@@ -1,4 +1,4 @@
-"""Integración con el contenido real offline de B2, sin crear un bucle de rol 4."""
+"""Integración del modelo con datos offline, sin pasar por el bucle de consola."""
 from adaptadores.datos_offline import DatosOffline
 from controlador.controlador_red import cargar_esqueleto_completo, ControladorRed
 from estructuras.vector_dinamico import Vector

@@ -1,7 +1,7 @@
-"""
-Array circular de tamaño fijo: nunca redimensiona, nunca desplaza elementos.
-Al llenarse sobreescribe la posición más antigua. Memoria estrictamente constante,
-tal y como se pide en la bitácora en pantalla.
+"""Buffer de capacidad fija para los mensajes de la consola.
+
+Cuando se llena, el siguiente mensaje ocupa el lugar del más antiguo.
+No necesita desplazar los demás elementos ni ampliar el almacenamiento.
 """
 
 class ArrayCircular:

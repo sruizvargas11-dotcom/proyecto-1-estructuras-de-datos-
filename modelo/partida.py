@@ -6,6 +6,7 @@ from modelo.historial import Historial
 from modelo.rastro import Rastro
 from modelo.reloj import Reloj
 from modelo.efectos import iniciar_regeneracion
+from modelo.ejecutor_evento import EjecutorEvento
 
 COSTO_ACCION_ENEMIGO = 100
 
@@ -73,12 +74,12 @@ class Partida:
         self.acciones_jugador = 0
         self.enemigos_derrotados = 0
 
-        # Observadores (Vector de funciones). Ver docstring del módulo.
+        # Funciones que reciben avisos de muerte, movimiento y mensajes del modelo.
         self.al_morir_enemigo = Vector()   # f(enemigo)
         self.al_entrar_sala = Vector()     # f(sala_anterior, sala_nueva)
         self.al_mensaje = Vector()         # f(tiempo, texto)
 
-        # Efectos temporales del rol 2: f(partida, objeto) -> bool. Ver usar_objeto.
+        # Función que aplica el efecto de un objeto: f(partida, objeto) -> bool.
         self.aplicar_efecto = None
 
         self.reloj.vincular_actor(jugador)
@@ -104,7 +105,7 @@ class Partida:
                 ("semilla", self.semilla))
 
     def resumen_puntaje(self):
-        """Campos de §2.12 (el nombre del jugador lo pide la vista)."""
+        """Resumen de acciones, enemigos derrotados, tiempo y resultado de la partida."""
         return (("cripta_id", self.cripta_id),
                 ("version_cripta", self.version_cripta),
                 ("acciones_jugador", self.acciones_jugador),
@@ -126,7 +127,7 @@ class Partida:
             raise RuntimeError("La partida debe iniciar con el reloj en 0.")
         sala = self.jugador.sala_actual
         self.rastro.registrar(sala.id, 0)
-        self.reloj.programar_inicial(self.jugador, _decision_jugador)
+        self.reloj.programar_inicial(self.jugador, EjecutorEvento('decision'))
         self.estado = EN_CURSO
         self.activar_enemigos(sala)
         self._emitir(f"Entras a {sala.nombre}.")
@@ -135,7 +136,7 @@ class Partida:
 
     def programar_siguiente_jugador(self, costo):
         """El controlador lo llama tras aplicar una acción del jugador."""
-        return self.reloj.programar(self.jugador, costo, _decision_jugador)
+        return self.reloj.programar(self.jugador, costo, EjecutorEvento('decision'))
 
     def contar_accion_jugador(self):
         """Una acción que consumió tiempo (§2.12). Reversible con el pergamino."""
@@ -199,9 +200,7 @@ class Partida:
         Al cargar una partida guardada se reconstruye con este mismo método a partir
         del dueño del evento (no se serializan funciones).
         """
-        def ejecutar(reloj):
-            self.turno_enemigo(enemigo)
-        return ejecutar
+        return EjecutorEvento('enemigo', enemigo, self)
 
     def turno_enemigo(self, enemigo):
         """Callback del heap"""
@@ -332,10 +331,14 @@ class Partida:
                 self._emitir(f"Usas {objeto.nombre}: +{curado} de vida.")
             if objeto.modificador_velocidad and self.aplicar_efecto is not None:
                 self.aplicar_efecto(self, objeto)
+                self._emitir(f"Usas {objeto.nombre}: velocidad {self.jugador.velocidad}.")
             self.consumir(nodo)
             return True
         if self.aplicar_efecto is not None and objeto.clase in ("antidoto", "antorcha"):
             if self.aplicar_efecto(self, objeto):
+                if objeto.clase == "antidoto":
+                    self.consumir(nodo)
+                self._emitir(f"Usas {objeto.nombre}.")
                 return True
         return False
 

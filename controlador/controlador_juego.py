@@ -33,6 +33,9 @@ _ALIAS = (
     ("I", "inventario"), ("INVENTARIO", "inventario"),
     ("H", "ayuda"), ("?", "ayuda"), ("AYUDA", "ayuda"),
     ("Q", "salir"), ("SALIR", "salir"),
+    ("G", "guardar"), ("GUARDAR", "guardar"),
+    ("L", "cargar"), ("CARGAR", "cargar"),
+    ("IS", "siguiente"), ("IA", "anterior"), ("IC", "consultar"),
 )
 
 
@@ -65,6 +68,14 @@ def interpretar(texto):
         return None, f"Comando desconocido: {partes[0]}. Escribe H para ver la ayuda."
     resto = partes[1:]
 
+    if nombre in ("guardar", "cargar"):
+        ruta = texto.strip().partition(' ')[2].strip().strip('"') or None
+        return Comando(nombre, ruta), None
+    maximo = 0 if nombre in ('esperar', 'pergamino', 'ayuda', 'salir',
+                            'siguiente', 'anterior', 'consultar') or clave in DIRECCIONES else 1
+    if len(resto) > maximo:
+        return None, 'Sobran argumentos. Escribe H para ver la ayuda.'
+
     if nombre == "mover":
         # 'N' sola, o 'mover N'.
         direccion = clave if clave in DIRECCIONES else (resto[0].upper() if resto else None)
@@ -78,9 +89,13 @@ def interpretar(texto):
     if nombre in ("atacar", "recoger", "soltar", "equipar", "usar"):
         if not resto:
             return Comando(nombre, 1), None
-        if not resto[0].isdigit() or int(resto[0]) < 1:
+        try:
+            numero = int(resto[0])
+        except ValueError:
+            numero = 0
+        if not resto[0].isdigit() or numero < 1:
             return None, "El número debe ser un entero positivo (1, 2, ...)."
-        return Comando(nombre, int(resto[0])), None
+        return Comando(nombre, numero), None
     if nombre == "inventario":
         criterio = resto[0].lower() if resto else None
         if criterio is not None and criterio not in CRITERIOS_INVENTARIO:
@@ -109,7 +124,7 @@ def _nodo_inventario(jugador, numero):
 
 
 class ControladorJuego:
-    def __init__(self, sesion, vista):
+    def __init__(self, sesion, vista, ruta_guardado=None):
         self.sesion = sesion
         self.partida = sesion.partida
         self.red = sesion.red
@@ -119,6 +134,7 @@ class ControladorJuego:
         self.historial = self.partida.historial
         self.jugador = self.partida.jugador
         self._salir = False
+        self.ruta_guardado = ruta_guardado or 'partidas/partida.sav'
         self._protegidas = Vector()     # tipo_ids marcados en_uso por el controlador
 
         self.contador_ciclos = 0
@@ -146,8 +162,8 @@ class ControladorJuego:
         """Un ciclo del bucle principal. Devuelve la entrada procesada."""
         self.contador_ciclos += 1
 
-        # 1. Extraer el evento mínimo del heap
-        entrada = self.reloj.extraer_siguiente()
+        # 1. Consultar el mínimo; el turno del jugador se retira dentro de su delta.
+        entrada = self.reloj.proximo()
         if entrada is None:
             raise RuntimeError("La agenda quedó vacía con la partida en curso.")
         evento = entrada.dato
@@ -156,6 +172,7 @@ class ControladorJuego:
 
         # 2. Turno del jugador
         if evento.tipo == "accion" and evento.dueno is self.jugador:
+            self.reloj.tiempo_actual = entrada.tiempo
             self.contador_turnos_jugador += 1
             costo = self._turno_jugador()
             if costo is not None:
@@ -163,21 +180,22 @@ class ControladorJuego:
 
         # 3. Turno de un enemigo
         elif evento.tipo == "accion" and isinstance(evento.dueno, Enemigo):
+            self.reloj.extraer_siguiente()
             self.contador_turnos_enemigo += 1
             self.partida.ejecutar_accion_enemigo(evento.dueno)
             actor = evento.dueno
 
-        # Efecto del entorno: rearme, cierre, veneno...
+        # Efecto del entorno: rearme, cierre, veneno... 
         else:
             # No es la acción de un actor: su callback ya contiene la regla y,
             # si es recurrente, se reprograma solo.
             self.contador_efectos += 1
+            self.reloj.extraer_siguiente()
             vida_antes = getattr(evento.dueno, "vida", None)
             self.reloj.ejecutar_evento(entrada)
             texto = describir_evento(self.partida, evento, vida_antes)
             if texto is not None:
                 self.vista.agregar_mensaje(self.reloj.tiempo_actual, texto)
-            # Un pulso de veneno puede matar al jugador sin que actúe nadie más.
             self.partida.verificar_fin()
 
         # 4. Programar la siguiente acción
@@ -222,6 +240,16 @@ class ControladorJuego:
                 continue
             if comando.nombre == "inventario":
                 self._mostrar_inventario(comando.argumento)
+                continue
+            if comando.nombre in ('siguiente', 'anterior', 'consultar'):
+                if comando.nombre == 'siguiente':
+                    self.jugador.siguiente()
+                elif comando.nombre == 'anterior':
+                    self.jugador.anterior()
+                self.vista.mostrar_objeto(self.jugador.cursor)
+                continue
+            if comando.nombre in ("guardar", "cargar"):
+                self._persistir(comando)
                 continue
             if comando.nombre == "pergamino":
                 self._usar_pergamino()
@@ -296,6 +324,12 @@ class ControladorJuego:
 
     def _validar_uso(self, objeto):
         if objeto.clase == "pocion":
+            entrada = self.jugador.evento_mod_velocidad
+            if objeto.modificador_velocidad and entrada is not None and entrada.valido:
+                return "Ya hay un modificador de velocidad activo."
+            nueva = self.jugador.velocidad + objeto.modificador_velocidad
+            if objeto.modificador_velocidad and (type(nueva) is not int or nueva < 1):
+                return "La poción no produce una velocidad entera positiva válida."
             return None
         if objeto.clase == "pergamino_retroceso":
             return "El pergamino se usa con P."
@@ -311,6 +345,7 @@ class ControladorJuego:
         """Aplica una acción ya validada. Devuelve su costo, o None si se anuló."""
         self.historial.iniciar_accion(self.reloj)
         try:
+            self.reloj.tomar_turno(self.jugador)
             costo = self._aplicar(comando)
         except Exception:
             # Fallo inesperado: el modelo vuelve al estado previo a la acción.
@@ -398,6 +433,7 @@ class ControladorJuego:
             return False
         if self.bitacora is not None:
             self.bitacora.registrar(momento, "pergamino")
+        self.sesion.acciones.agregarValor((momento, "pergamino"))
         self.vista.agregar_mensaje(
             self.reloj.tiempo_actual,
             "Lees el pergamino: el tiempo retrocede a antes de tu última acción.")
@@ -414,7 +450,7 @@ class ControladorJuego:
 
 
     def _sincronizar_protegidas(self):
-        """Recalcula qué fichas protege la posición actual (robusto al retroceso)."""
+        """Actualiza las fichas protegidas según la posición y el inventario del jugador."""
         nuevas = Vector()
         for nodo in self.jugador.inventario.recorrer_desde_frente():
             nuevas.agregarValor(nodo.valor.tipo_id)
@@ -429,19 +465,53 @@ class ControladorJuego:
         self._protegidas = nuevas
 
     def _registrar_en_bitacora(self, texto):
+        self.sesion.acciones.agregarValor((self.reloj.tiempo_actual, texto))
         if self.bitacora is not None:
             self.bitacora.registrar(self.reloj.tiempo_actual, texto)
 
-    def _cerrar(self, completa=True):
-        """Fin de sesión: cierra el intervalo abierto, la bitácora y la red.
+    def _persistir(self, comando):
+        from controlador.guardado import guardar, cargar
+        from bitacora_partida import BitacoraPartida
+        from pathlib import Path
+        import uuid
+        ruta = comando.argumento or self.ruta_guardado
+        try:
+            if comando.nombre == 'guardar':
+                leer_mensajes = getattr(self.vista, 'mensajes', None)
+                mensajes = leer_mensajes() if callable(leer_mensajes) else None
+                guardar(self.sesion, ruta, self._protegidas, mensajes)
+                self.vista.agregar_mensaje(self.partida.tiempo, f'Partida guardada: {ruta}')
+                return
+            nueva = cargar(ruta, self.sesion)
+            # Una carga abre otra rama de bitácora: nunca trunca el log anterior.
+            if self.bitacora is not None:
+                destino = Path(self.bitacora.ruta).with_name('carga_' + uuid.uuid4().hex + '.log')
+                cabecera = dict(nueva.partida.encabezado())
+                nueva.bitacora = BitacoraPartida.partida_nueva(str(destino), **cabecera)
+                for tiempo, accion in nueva.acciones:
+                    nueva.bitacora.registrar(tiempo, accion)
+                self.bitacora.cerrar()
+            self.red.cerrar(5)
+            self.sesion, self.partida, self.red = nueva, nueva.partida, nueva.red
+            self.bitacora = nueva.bitacora
+            self.reloj, self.historial, self.jugador = (self.partida.reloj,
+                                                       self.partida.historial,
+                                                       self.partida.jugador)
+            # El guardado incluye las referencias LRU protegidas de este punto.
+            self._protegidas = nueva.protegidas if nueva.protegidas is not None else Vector()
+            self.partida.al_mensaje.agregarValor(self.vista.agregar_mensaje)
+            if nueva.mensajes_guardados is not None and hasattr(self.vista, 'restaurar_mensajes'):
+                self.vista.restaurar_mensajes(nueva.mensajes_guardados)
+            self.vista.agregar_mensaje(self.partida.tiempo, f'Partida cargada: {ruta}')
+        except (OSError, ValueError, RuntimeError) as error:
+            self._rechazar(f'No se pudo {comando.nombre}: {error}')
 
-        El cierre (estado final completo) solo se escribe si el bucle terminó
-        sin errores; tras una excepción el estado no es un resultado válido.
-        """
+    def _cerrar(self, completa=True):
+        """Fin de sesión: cierra el intervalo abierto, la bitácora y la red."""
         if self.historial.registrando:
             self.historial.confirmar_accion()
         if self.bitacora is not None and completa:
-            self.bitacora.registrar_cierre(self.reloj.tiempo_actual, self.partida.estado,
+            self.bitacora.registrar_cierre(self.partida.tiempo, self.partida.estado,
                                            lineas_estado(self.partida))
         if self.bitacora is not None:
             self.bitacora.cerrar()

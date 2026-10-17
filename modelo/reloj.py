@@ -39,7 +39,7 @@ class Reloj:
 
     @property
     def azar(self):
-        """Compartir ESTA instancia con Enemigo.decidir_accion, no crear otra."""
+        """Generador compartido por las decisiones y el combate de esta partida."""
         return self._azar
 
     @staticmethod
@@ -200,10 +200,10 @@ class Reloj:
             self._ejecutando = False
 
     def avanzar_y_ejecutar(self, hasta=None):
-        """Sin hasta ejecuta UN evento; con hasta, todos <= ese instante.
+        """Ejecuta un evento o todos los que vencen hasta el instante indicado.
 
-        Para volver a la decisión del jugador usar avanzar_hasta_turno:
-        incluye el desempate por seq y cambios de velocidad durante la espera.
+        Para detenerse en una decisión del jugador se usa avanzar_hasta_turno,
+        que respeta los desempates y los cambios de velocidad durante la espera.
         """
         if self._ejecutando:
             raise RuntimeError('Un ejecutor no puede avanzar recursivamente el reloj.')

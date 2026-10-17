@@ -4,7 +4,7 @@ from controlador.estado_final import lineas_estado, primera_diferencia
 from controlador.inicio_partida import nueva_partida
 
 
-class ErrorReplayDivergente(Exception):
+class ErrorReplayDivergente(ValueError):
     """La reproducción dejó de coincidir con lo que dice la bitácora."""
 
 
@@ -116,23 +116,32 @@ class ResultadoReplay:
         return self.diferencia is None
 
 
-def reproducir(ruta_log, fuente, carpeta_cache=None, escribir=None):
+def reproducir(ruta_log, fuente, carpeta_cache=None, escribir=None, cache_size=25,
+               despachador=None):
     """Reproduce la bitácora. Lanza ErrorVersionIncompatible antes de ejecutar
     cualquier acción si los datos actuales no son los del log, y
     ErrorReplayDivergente si la reproducción se separa de lo registrado."""
     bitacora = BitacoraPartida.abrir(ruta_log)
     acciones = bitacora.leer_acciones()
     cierre_original = bitacora.leer_cierre()
+    permitidas = ('mover', 'atacar', 'esperar', 'recoger', 'soltar',
+                 'equipar', 'usar', 'abrir', 'pergamino')
+    for tiempo, accion in acciones:
+        if accion.split(' ')[0] not in permitidas:
+            raise ErrorReplayDivergente('Bitácora con acción no reproducible.')
 
     # Cargar la cripta y el catálogo no ejecuta acciones; da las versiones
     # vigentes sin gastar solicitudes extra.
     sesion = nueva_partida(fuente, bitacora.cripta_id, carpeta_cache,
-                           semilla=bitacora.semilla, ruta_bitacora=None)
+                           semilla=bitacora.semilla, ruta_bitacora=None, cache_size=cache_size,
+                           despachador=despachador)
     try:
         return _reproducir_sesion(sesion, bitacora, acciones, cierre_original, escribir)
     except (ErrorVersionIncompatible, ErrorReplayDivergente) as error:
         error.sesion = sesion        # el reporte de red la necesita
         raise
+    finally:
+        sesion.red.cerrar(5)
 
 
 def _reproducir_sesion(sesion, bitacora, acciones, cierre_original, escribir):
@@ -159,6 +168,8 @@ def _reproducir_sesion(sesion, bitacora, acciones, cierre_original, escribir):
     if grabadora.acciones != acciones:
         raise ErrorReplayDivergente("Las acciones reproducidas no coinciden con la bitácora.")
 
+    if cierre_original is not None and cierre_original[:2] != grabadora.cierre[:2]:
+        raise ErrorReplayDivergente("El tiempo o resultado del cierre no coincide con la bitácora.")
     resultado = ResultadoReplay(sesion, guion, grabadora, cierre_original)
     if resultado.verificado is False:
         linea, esperada, obtenida = resultado.diferencia

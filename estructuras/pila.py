@@ -1,8 +1,8 @@
-"""
-Pila (LIFO) con capacidad máxima fija. Al superar el límite, descarta automáticamente el
-elemento más antiguo (el fondo), no el que se intenta apilar. Construida sobre ListaDoble:
-apilar/desapilar usan el frente, y el descarte por límite usa el fondo. Para el historial de retroceso,
-cada elemento es un grupo de deltas, nunca una copia completa.
+"""Pila de capacidad limitada sobre ListaDoble.
+
+Apilar y desapilar usan el frente. Si se supera el límite, se retira
+el elemento del fondo, que es el más antiguo. En el historial, cada
+elemento contiene los deltas de un intervalo del juego.
 """
 
 from estructuras.lista_doble import ListaDoble

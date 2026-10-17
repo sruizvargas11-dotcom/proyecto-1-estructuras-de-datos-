@@ -34,7 +34,7 @@ def _sesion(tmp_path, semilla=12345, **extra):
 
 
 def _mover(partida, destino, costo=100):
-    """Flujo de una acción según docs/ROL3_BLOQUE3.md (lo que hará el controlador)."""
+    """Ejecuta una acción siguiendo el ciclo del controlador descrito en ROL3_BLOQUE3.md."""
     reloj, jugador, historial = partida.reloj, partida.jugador, partida.historial
     reloj.avanzar_hasta_turno(jugador)
     historial.iniciar_accion(reloj)

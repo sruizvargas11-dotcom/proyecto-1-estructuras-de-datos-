@@ -1,5 +1,8 @@
-# persistencia/partida_binaria.py
+# Formato binario con índice por sala y bloques de datos JSON.
 import json, os
+
+from estructuras.vector_dinamico import Vector
+from estructuras.ordenamientos import ordenar
 
 # "CRPT" en bytes — sirve para reconocer el archivo como nuestro
 MAGIC           = 0x43525054
@@ -12,7 +15,20 @@ def _escribir(f, numero, n_bytes):
 
 def _leer(f, n_bytes):
     # lee n_bytes y los interpreta como entero big-endian
-    return int.from_bytes(f.read(n_bytes), byteorder="big")
+    datos = f.read(n_bytes)
+    if len(datos) != n_bytes:
+        raise ErrorFormatoBinario('Archivo binario truncado.')
+    return int.from_bytes(datos, byteorder="big")
+
+
+def _leer_json(f, longitud):
+    if longitud > os.fstat(f.fileno()).st_size - f.tell():
+        raise ErrorFormatoBinario('Longitud fuera del archivo.')
+    return json.loads(f.read(longitud))
+
+def _comparar_pares(a, b):
+    """Compara pares (sala_id, datos) por sala_id, para ordenar() propio."""
+    return (a[0] > b[0]) - (a[0] < b[0])
 
 
 class ErrorFormatoBinario(Exception):
@@ -35,12 +51,28 @@ class PartidaBinaria:
 
     # ── guardar ──────────────────────────────────────────────────────────
 
-    def guardar(self, estado_global: dict, estado_salas: dict):
-        """Escribe todo el estado al archivo."""
+    def guardar(self, estado_global: dict, salas):
+        """Escribe todo el estado al archivo.
+
+        salas: secuencia de pares (sala_id:int, datos), en cualquier orden
+        (lista o Vector propio). Un sala_id repetido es un error del
+        llamador, no un estado válido para guardar.
+        """
         os.makedirs(os.path.dirname(self.ruta) or ".", exist_ok=True)
 
-        sala_ids  = sorted(estado_salas.keys())   # ordenados para búsqueda binaria
-        num_salas = len(sala_ids)
+        pares = Vector()
+        for sala_id, datos in salas:
+            pares.agregarValor((sala_id, datos))
+
+        ordenar(pares, _comparar_pares)   # ordenados para búsqueda binaria
+
+        for i in range(1, len(pares)):
+            anterior = pares.obtenerValor(i - 1)
+            actual   = pares.obtenerValor(i)
+            if anterior[0] == actual[0]:
+                raise ValueError(f"sala_id repetido al guardar: {actual[0]}")
+
+        num_salas = len(pares)
 
         b_global = json.dumps(estado_global, ensure_ascii=False).encode()
 
@@ -48,11 +80,14 @@ class PartidaBinaria:
         # encabezado(12) + índice(n×8) + longitud_global(4) + datos_global
         inicio_datos = 12 + num_salas * 8 + 4 + len(b_global)
 
-        offsets = []
+        bloques = Vector()   # bytes JSON de cada sala, en el mismo orden que 'pares'
+        offsets = Vector()
         cursor  = inicio_datos
-        for sid in sala_ids:
-            offsets.append(cursor)
-            b = json.dumps(estado_salas[sid], ensure_ascii=False).encode()
+        for i in range(num_salas):
+            sid, datos = pares.obtenerValor(i)
+            b = json.dumps(datos, ensure_ascii=False).encode()
+            bloques.agregarValor(b)
+            offsets.agregarValor(cursor)
             cursor += 4 + 4 + len(b)   # sala_id + longitud + datos
 
         with open(self.ruta, "wb") as f:
@@ -64,17 +99,19 @@ class PartidaBinaria:
             _escribir(f, inicio_datos,    4)   # offset donde empiezan los bloques
 
             # índice: permite saltar directo a cualquier sala sin leer todo
-            for sid, off in zip(sala_ids, offsets):
+            for i in range(num_salas):
+                sid, _ = pares.obtenerValor(i)
                 _escribir(f, sid, 4)
-                _escribir(f, off, 4)
+                _escribir(f, offsets.obtenerValor(i), 4)
 
             # estado global (reloj, jugador, inventario, semilla…)
             _escribir(f, len(b_global), 4)
             f.write(b_global)
 
             # un bloque por cada sala
-            for sid in sala_ids:
-                b = json.dumps(estado_salas[sid], ensure_ascii=False).encode()
+            for i in range(num_salas):
+                sid, _ = pares.obtenerValor(i)
+                b = bloques.obtenerValor(i)
                 _escribir(f, sid,    4)
                 _escribir(f, len(b), 4)
                 f.write(b)
@@ -94,7 +131,10 @@ class PartidaBinaria:
                 f"Versión del archivo ({version}) no compatible "
                 f"con esta versión del programa ({VERSION_FORMATO})."
             )
-        return _leer(f, 2), _leer(f, 4)   # num_salas, inicio_datos
+        num_salas, inicio_datos = _leer(f, 2), _leer(f, 4)
+        if not 12 + 8 * num_salas + 4 <= inicio_datos <= os.fstat(f.fileno()).st_size:
+            raise ErrorFormatoBinario('Índice o inicio de datos inválido.')
+        return num_salas, inicio_datos
 
     def cargar_global(self) -> dict:
         """Lee solo el estado global; no toca los bloques de sala."""
@@ -102,53 +142,69 @@ class PartidaBinaria:
             num_salas, _ = self._leer_encabezado(f)
             f.seek(12 + num_salas * 8)   # saltamos el índice entero
             longitud = _leer(f, 4)
-            return json.loads(f.read(longitud))
+            return _leer_json(f, longitud)
 
     def cargar_sala_binaria(self, sala_id: int) -> dict | None:
-        """
-        Carga una sala específica usando búsqueda binaria sobre el índice
-        y un único seek. No lee el archivo completo.
+        """Busca una sala directamente en el índice del archivo.
+
+        Cada paso lee una entrada de 8 bytes. La búsqueda necesita O(log n)
+        lecturas del índice y después un desplazamiento al bloque de la sala.
         """
         with open(self.ruta, "rb") as f:
-            num_salas, _ = self._leer_encabezado(f)
+            num_salas, inicio_datos = self._leer_encabezado(f)
+            off = self._buscar_offset_en_indice(f, num_salas, sala_id)
+            if off is None:
+                return None   # la sala no estaba guardada
 
-            # cargamos el índice en memoria (es pequeño, n × 8 bytes)
-            indice = [(_leer(f, 4), _leer(f, 4)) for _ in range(num_salas)]
+            if not inicio_datos <= off <= os.fstat(f.fileno()).st_size - 8:
+                raise ErrorFormatoBinario('Offset de sala fuera del archivo.')
+            f.seek(off)
+            if _leer(f, 4) != sala_id:
+                raise ErrorFormatoBinario('El índice apunta a otra sala.')
+            longitud = _leer(f, 4)
+            return _leer_json(f, longitud)
 
-        # búsqueda binaria O(log n) sobre el índice
-        izq, der = 0, num_salas - 1
-        while izq <= der:
-            medio    = (izq + der) // 2
-            sid, off = indice[medio]
+    def _buscar_offset_en_indice(self, f, num_salas, sala_id):
+        """Búsqueda binaria sobre las entradas de 8 bytes del índice en
+        disco (arranca justo después del encabezado de 12 bytes)."""
+        inicio_indice = 12
+        inicio, fin = 0, num_salas - 1
+
+        while inicio <= fin:
+            medio = (inicio + fin) // 2
+            f.seek(inicio_indice + medio * 8)
+            sid = _leer(f, 4)
+            off = _leer(f, 4)
 
             if sid == sala_id:
-                # encontrada — saltamos directo a su bloque
-                with open(self.ruta, "rb") as f:
-                    f.seek(off + 4)              # +4 para saltarnos el sala_id
-                    longitud = _leer(f, 4)
-                    return json.loads(f.read(longitud))
-
-            elif sid < sala_id:
-                izq = medio + 1
+                return off
+            if sid < sala_id:
+                inicio = medio + 1
             else:
-                der = medio - 1
+                fin = medio - 1
 
-        return None   # la sala no estaba guardada
+        return None
 
     def cargar_todo(self) -> tuple:
-        """Carga estado global + todas las salas. Útil para pruebas."""
+        """Carga estado global + todas las salas. Útil para pruebas.
+
+        Devuelve (estado_global, salas), donde 'salas' es la secuencia de
+        pares (sala_id, datos) ordenados por sala_id (así quedaron
+        escritos en el archivo).
+        """
         with open(self.ruta, "rb") as f:
             num_salas, _ = self._leer_encabezado(f)
             for _ in range(num_salas):
                 f.read(8)   # saltamos el índice
 
             longitud      = _leer(f, 4)
-            estado_global = json.loads(f.read(longitud))
+            estado_global = _leer_json(f, longitud)
 
-            estado_salas = {}
+            salas = []
             for _ in range(num_salas):
-                sid               = _leer(f, 4)
-                longitud          = _leer(f, 4)
-                estado_salas[sid] = json.loads(f.read(longitud))
+                sid      = _leer(f, 4)
+                longitud = _leer(f, 4)
+                datos    = _leer_json(f, longitud)
+                salas.append((sid, datos))
 
-        return estado_global, estado_salas
+        return estado_global, salas
