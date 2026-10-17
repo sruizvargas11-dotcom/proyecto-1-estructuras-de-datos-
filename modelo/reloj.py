@@ -1,6 +1,7 @@
 """Agenda virtual determinista; no conoce HTTP, disco ni interfaz gráfica."""
 import random
 from estructuras.heap_minimo import HeapMinimo
+from estructuras.vector_dinamico import Vector
 from modelo.deltas import DeltaAtributos, DeltaEvento, DeltaEfecto, DeltaVelocidad
 
 
@@ -171,6 +172,21 @@ class Reloj:
         entero(defensa, 'defensa')
         self.contador_calculos_dano += 1
         return max(1, ataque + self._azar.randint(0, 4) - defensa)
+
+    def proximos_eventos(self, n):
+        """Lectura de solo lectura de los próximos n eventos pendientes (para un
+        panel informativo tipo 'próximos turnos'); no muta la agenda. Delega en
+        HeapMinimo.vista_ordenada, que ya omite las entradas canceladas, y aquí
+        se descartan además las de un dueño ya muerto. En la práctica esto casi
+        nunca filtra nada, porque Actor.morir() ya cancela los eventos
+        pendientes del actor al llamar a reloj.cancelar_actor(); el filtro es
+        defensivo, no depende de esa garantía para no exponer un actor muerto.
+        """
+        resultado = Vector()
+        for entrada in self.agenda.vista_ordenada(n):
+            if getattr(entrada.dato.dueno, 'vivo', True):
+                resultado.agregarValor(entrada)
+        return resultado
 
     def proximo(self):
         """Limpia cancelados; la consulta posterior del heap es O(1)."""
