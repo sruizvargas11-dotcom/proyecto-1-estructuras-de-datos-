@@ -2,17 +2,56 @@
 (Redacta ROL 4, Revisa ROL 1)
 
 1 - PROBLEMA
-¿Cual es la situación a resolver?
-¿Qué operaciones debería ejecutar el programa?
+El juego debe tener en memoria el contenido de una sala (enemigos, objetos y trampas) antes de que el jugador ingrese a ella (§4.2: el jugador nunca puede quedar en una sala cuyo contenido no se conoce).
+El juego además debe decidir qué salas pedir y cuándo debe hacerlo. Cada solicitud tarda alrededor de 400 ms y consume presupuesto_solicitudes, pero cuesta prácticamente lo mismo pedir 1 sala que 10 (§3.4). Hay que tomar en cuenta que no se puede pedir dos veces la misma sala, y las respuestas tienen que entrar al modelo en un orden independiente al momento en que llegan, para que la partida dependa solo de la versión de la cripta, la semilla y las acciones.
+Para lograr lo descrito, el programa ejecuta las siguientes operaciones (todas en controlador/controlador_red.py, clase ControladorRed):
+- Garantizar el contenido de la sala destino en cada movimiento del jugador (asegurar_entrada -> garantizar_contenido). Si ya está cargada no hace ninguna solicitud; si no, espera en tiempo real sin mover el reloj virtual.
+- Planificar la precarga de las próximas salas después de cada movimiento (planificar_precarga): encola las vecinas directas y las vecinas de esas vecinas que todavía no se han pedido. Esto permite que el juego conozca qué contenidos traer antes de que el jugador decida su siguiente movimiento.
+- Enviar un lote de hasta 10 salas de la cola después de cada movimiento (procesar_cola).
+- Incorporar al modelo, en orden de número de solicitud, las respuestas que ya llegaron, al inicio de cada turno del jugador (incorporar_listas).
+- Consultar, dentro de las operaciones anteriores, si una sala ya está encolada, pedida o cargada (pertenencia en Vector).
+Frecuencia: por cada movimiento del jugador se ejecuta 1 garantizar_contenido, 1 planificar_precarga y 1 procesar_cola; por cada turno del jugador, 1 incorporar_listas.
+Frecuencia medida [PENDIENTE: sección A de bench/bench_precarga.py]: consultas de pertenencia por movimiento, elementos revisados por consulta, tamaño máximo de la cola y salas promedio por lote, para n = 25, 100 y 400 salas.
 
 2 - ALTERNATIVAS
-Al menos 2 opciones y la razón concreta por la que una o varias se descartaron
+Estrategias de precarga:
+- Sin precarga (pedir cada sala al entrar): es la más simple y nunca pide salas que no se visitan, pero cada sala nueva implica una espera de ~400 ms en la puerta. Se descarta porque en el enuncido se exige que la estrategia normal evite esa espera.
+- Solo vecinas directas (1 nivel): evita la espera del siguiente movimiento, pero si el jugador se mueve dos veces antes de que llegue el lote (por ejemplo, con --hilos), la sala a dos pasos puede no estar lista. También genera más lotes pequeños. Se descarta en favor de 2 niveles.
+- Vecinas directas + vecinas de vecinas (2 niveles): adelanta todo lo alcanzable en dos movimientos sin pedir salas lejanas. es la estrategia elegida.
+- Mapa completo al inicio: es la que menos solicitudes de contenido hace, pero todas ocurren antes de la primera acción (espera inicial proporcional al tamaño de la cripta), carga salas que nunca se visitan y en una cripta grande puede consumir el presupuesto antes de empezar a jugar. Se descarta porque el costo crece con la cripta y no con lo que el jugador recorre.
+- Cola de pendientes: Cola propia sobre nodos enlazados contra list de Python con pop(0). pop(0) desplaza todos los elementos (O(n)); la Cola desencola en O(1) con punteros al frente y al final. Además, §7 exige implementar las estructuras propias.
+- Pertenencia ("¿ya fue pedida?"): Vector con búsqueda lineal contra ArrayOrdenado con búsqueda binaria. El ArrayOrdenado busca en O(log n) pero inserta en O(n) por desplazamientos; el Vector agrega en O(1) amortizado y busca en O(n). Con las pocas salas que se tocan en una partida, la diferencia se mide en el punto 5.
 
 3 - DECISIÓN
-Estrategia implementada y cómo se estructuró en el programa
+Estrategia: vecinas directas + vecinas de vecinas, un lote de hasta 10 salas por turno. Si el jugador intenta entrar a una sala que no está lista, garantizar_contenido la pide en ese momento y completa el lote con salas pendientes de la cola, porque el costo es el mismo con 1 que con 10.
+Estructuras en ControladorRed:
+- _pendientes (Cola, sin límite): sala_ids por pedir, en orden de prioridad. Las vecinas directas se encolan primero y por eso salen en el primer lote. Sin límite para no descartar solicitudes pendientes.
+- _encoladas (Vector): sala_ids que están ahora mismo en la cola; evita encolar dos veces la misma sala.
+- _solicitadas (Vector): sala_ids pedidas o en camino; garantiza que una sala no se solicite dos veces. Si una solicitud falla, sus salas se quitan de aquí y vuelven a la cola.
+- _incorporadas (Vector): sala_ids cuyo contenido ya está en el modelo.
+- _buffer (BufferReordenamiento, Vector de ranuras numeradas): guarda cada respuesta hasta que llegaron todas las de número menor.
+- _registro (Vector): (número, sub, clase, ids, en_red) de cada solicitud, para verificar que el mismo juego genera la misma secuencia.
+Ciclo de una solicitud:
+1. Decidir: en el hilo principal y solo con el estado del juego (posición, esqueleto y lo ya solicitado), nunca con respuestas ya llegadas. Antes de pedir a la red se lee del disco lo vigente.
+2. Numerar: el lote recibe el siguiente número del buffer, aunque todo venga de disco, para que el orden de incorporación no dependa de la caché.
+3. Enviar: con DespachoInmediato la solicitud se hace en el acto; con DespachoEnHilos (--hilos) viaja en otro hilo y la respuesta se entrega al buffer.
+4. Incorporar: en puntos fijos y estrictamente en orden de número. Se resuelven las fichas del lote juntas (sub-solicitudes de catálogo numeradas n.1, n.2...), se construyen todas las entidades y se publican todo o nada. Los enemigos quedan en enemigos_dormidos: incorporar no activa enemigos ni programa eventos (§2.4).
+Integración con el juego:
+- inicio_partida.py planifica la precarga de la sala inicial antes de garantizarla, así la sala inicial y sus vecinas viajan en una sola solicitud.
+- controlador_juego.py llama incorporar_listas() al inicio de cada turno del jugador; asegurar_entrada() al intentar moverse (si falla, el movimiento se rechaza con un mensaje y no se registra nada); y planificar_precarga(destino) + procesar_cola() después de moverse.
+Fallos y presupuesto (decisión abierta 4 del plan):
+- Una precarga que falla no detiene el juego: sus salas vuelven a la cola y el error queda en ultimo_error.
+- garantizar_contenido reintenta una vez solo si el error no es de datos inválidos y la fuente sigue dentro del presupuesto; espera como máximo 120 s de tiempo real. Si aun así falla, el movimiento se rechaza.
+- No se reservan solicitudes para garantizar_contenido: la precarga puede gastar el presupuesto que luego necesite un movimiento.
 
 4 - COMPLEJIDAD ALGORÍTMICA
-Por lo menos la de la operación más frecuente
+Notación: S = salas pedidas, I = salas incorporadas, E = tamaño de la cola, p = solicitudes en vuelo.
+- Operación más frecuente: consulta de pertenencia en Vector (_contiene), O(n) sobre el Vector consultado (S, I o E). Se ejecuta varias veces por movimiento dentro de las operaciones siguientes.
+- garantizar_contenido con la sala ya cargada (caso normal de cada movimiento): O(I). incorporar_listas cuesta O(1) si no hay respuestas pendientes.
+- planificar_precarga: como máximo 4 vecinas directas y 12 de segundo nivel (cada sala tiene a lo sumo 4 salidas); por cada una se revisa pertenencia: O(16 · (E + S)).
+- procesar_cola: hasta 10 desencolar en O(1) cada uno, más quitar el id de _encoladas y revisar _solicitadas: O(10 · (E + S)). Enviar el lote: O(10) más las lecturas de disco.
+- incorporar_listas: tomar_siguiente es O(1) amortizado (compacta el Vector de ranuras cada 32 consumidas). entregar es O(p) y buscar la solicitud de una sala en vuelo es O(10 · p); p suele ser 0 o 1.
+- Espacio: O(S + número de solicitudes), por los Vectores de ids y el registro.
 
 5 - EVIDENCIA
 Tabla del --bench que incluya:
