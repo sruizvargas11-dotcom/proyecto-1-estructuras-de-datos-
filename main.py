@@ -40,10 +40,15 @@ def main(argumentos=None):
                         help='Historial de reportes de red (por defecto partidas/reportes_red.txt)')
     parser.add_argument('--bench', action='store_true', help='Ejecutar benchmarks')
     parser.add_argument('--offline-dir', help='Datos locales alternativos; requiere --offline')
-    parser.add_argument('--partidas-dir', default='partidas', help='Guardados y bitácoras')
+    parser.add_argument('--partidas-dir', default='partidas',
+                        help='Guardados, bitácoras y tabla de puntajes')
+    parser.add_argument('--gui', action='store_true',
+                        help='Jugar con la vista Pygame en vez de la consola')
     opciones = parser.parse_args(argumentos)
     if opciones.replay and opciones.bench:
         parser.error('--replay y --bench son modos excluyentes')
+    if opciones.gui and (opciones.replay or opciones.bench or opciones.solo_mapa):
+        parser.error('--gui no se puede combinar con --replay, --bench ni --solo-mapa')
     if opciones.offline_dir and not opciones.offline:
         parser.error('--offline-dir requiere --offline')
     if opciones.bench:
@@ -65,6 +70,8 @@ def main(argumentos=None):
         fuente = crear_fuente(args_fuente)
         if opciones.replay:
             return reproducir(fuente, opciones)
+        if opciones.gui:
+            return jugar_gui(fuente, opciones)
         cripta_id = opciones.cripta
         if cripta_id is None:
             respuesta = fuente.listar_criptas()
@@ -105,97 +112,56 @@ def _mostrar_reporte(fuente, sesion, modo, motivo, opciones, bitacora=None):
 
 
 def jugar(fuente, cripta_id, opciones):
-    """Partida nueva, reporte de red y registro del resultado al terminar."""
+    """Partida nueva: semilla automática, bitácora y bucle principal."""
     from controlador.controlador_juego import ControladorJuego
     from controlador.despacho_red import DespachoEnHilos
-    from controlador.inicio_partida import (
-        nueva_partida,
-        ruta_bitacora_por_defecto,
-    )
+    from controlador.inicio_partida import nueva_partida, ruta_bitacora_por_defecto
     from controlador.semilla import generar_semilla
-    from utilidades.puntajes import Puntaje, registrar_puntaje
+    from persistencia.puntajes import TablaPuntajes
     from vista.vista_consola import VistaConsola
 
     semilla = generar_semilla()
-
-    ruta_log = ruta_bitacora_por_defecto(
-        cripta_id,
-        semilla,
-        str(Path(opciones.partidas_dir) / "bitacoras"),
-    )
-
+    ruta_log = ruta_bitacora_por_defecto(cripta_id, semilla,
+                        str(Path(opciones.partidas_dir) / 'bitacoras'))
+    vista = VistaConsola()
+    nombre_jugador = vista.pedir_nombre_jugador()
     sesion = nueva_partida(
-        fuente,
-        cripta_id,
-        opciones.cache_dir,
-        semilla=semilla,
+        fuente, cripta_id, opciones.cache_dir, semilla=semilla,
         ruta_bitacora=ruta_log,
         cache_size=opciones.cache_size,
         despachador=DespachoEnHilos() if opciones.hilos else None,
-    )
-
-    vista = VistaConsola()
+        nombre_jugador=nombre_jugador)
     vista.mostrar_inicio(cripta_id, semilla)
-
-    controlador = ControladorJuego(
-        sesion,
-        vista,
-        str(Path(opciones.partidas_dir) / "partida.sav"),
-    )
-
+    controlador = ControladorJuego(sesion, vista,
+                                    str(Path(opciones.partidas_dir) / 'partida.sav'),
+                                    TablaPuntajes(str(Path(opciones.partidas_dir)
+                                                      / 'puntajes.json')))
     try:
         controlador.jugar()
     except Exception as error:
-        _mostrar_reporte(
-            fuente,
-            controlador.sesion,
-            "partida",
-            motivo_error(error),
-            opciones,
-            getattr(controlador.bitacora, "ruta", ruta_log),
-        )
+        _mostrar_reporte(fuente, controlador.sesion, 'partida', motivo_error(error), opciones,
+                         getattr(controlador.bitacora, 'ruta', ruta_log))
         error.reportado = True
         raise
-
-    # L puede reemplazar la sesión: usar siempre la partida vigente.
-    partida = controlador.partida
-
-    _mostrar_reporte(
-        fuente,
-        controlador.sesion,
-        "partida",
-        motivo_partida(partida.estado),
-        opciones,
-        getattr(controlador.bitacora, "ruta", ruta_log),
-    )
-
-    nombre = vista.pedir_nombre_puntaje()
-    ruta_puntajes = Path(opciones.partidas_dir) / "puntajes.json"
-
-    try:
-        puntaje = Puntaje(
-            nombre=nombre,
-            cripta_id=partida.cripta_id,
-            version_cripta=partida.version_cripta,
-            acciones_jugador=partida.acciones_jugador,
-            enemigos_derrotados=partida.enemigos_derrotados,
-            tiempo_final=partida.tiempo,
-            resultado=partida.estado,
-        )
-
-        tabla = registrar_puntaje(ruta_puntajes, puntaje)
-
-    except (OSError, ValueError) as error:
-        vista.mostrar_error_puntaje(error)
+    _mostrar_reporte(fuente, controlador.sesion, 'partida',
+                     motivo_partida(controlador.partida.estado), opciones,
+                     getattr(controlador.bitacora, 'ruta', ruta_log))
+    if controlador.error_puntaje is not None:
+        vista.mostrar_error_puntaje(controlador.error_puntaje)
         return 1
+    vista.mostrar_tabla_puntajes(controlador.tabla_puntajes,
+        controlador.partida.cripta_id, controlador.partida.version_cripta,
+        str(Path(opciones.partidas_dir) / 'puntajes.json'))
+    return 0
 
-    vista.mostrar_tabla_puntajes(
-        tabla,
-        partida.cripta_id,
-        partida.version_cripta,
-        ruta_puntajes,
-    )
 
+def jugar_gui(fuente, opciones):
+    """Partida nueva con la vista Pygame. --replay y --bench nunca pasan por
+    aquí (regla del curso): este es el único punto que importa pygame."""
+    from vista_pygame.app import ejecutar as ejecutar_gui
+
+    ejecutar_gui(fuente, carpeta_cache=opciones.cache_dir, cache_size=opciones.cache_size,
+                partidas_dir=opciones.partidas_dir)
     return 0
 
 

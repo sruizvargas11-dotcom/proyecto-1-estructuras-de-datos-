@@ -31,7 +31,8 @@ def test_carga_replay_con_cierre_verificado_y_metricas_conservadas(tmp_path):
 
 def test_main_reporte_usa_sesion_y_log_despues_de_cargar(tmp_path, monkeypatch):
     # La sesión antes de L llega a t=100; la cargada termina en t=200.
-    monkeypatch.setattr('sys.stdin', io.StringIO('G\nW\nL\nW\nW\nQ\n'))
+    # Primera línea: nombre del jugador (vacía = usa el valor por defecto).
+    monkeypatch.setattr('sys.stdin', io.StringIO('\nG\nW\nL\nW\nW\nQ\n'))
     reportes = tmp_path / 'reportes.txt'
     assert main(['--offline', '--cripta', 'cripta-01', '--partidas-dir', str(tmp_path),
                  '--cache-dir', str(tmp_path/'cache'), '--reportes', str(reportes)]) == 0

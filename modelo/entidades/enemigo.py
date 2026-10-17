@@ -101,26 +101,34 @@ class Enemigo(Actor):
         if self.comportamiento == "guardián":
             return ("esperar", None)
 
-        disponibles = Vector()
-
-        # Mantener este orden hace reproducible la selección aleatoria.
-        for direccion in ("N", "S", "E", "O"):
-            salida = self.sala_actual.salida_hacia(direccion)
-
-            if salida is not None and not salida.cerrada:
-                if salida.sala_destino is None:
-                    raise RuntimeError(
-                        "La salida todavía no tiene destino enlazado."
-                    )
-
-                disponibles.agregarValor(
-                    salida.sala_destino
-                )
-
-        if len(disponibles) == 0:
-            return ("esperar", None)
+        # Una sola pasada por las salidas (antes, una por dirección). Se ubican
+        # por dirección y luego se arman en orden N, S, E, O: ese orden hace
+        # reproducible la selección aleatoria del errante.
+        norte = sur = este = oeste = None
+        for salida in self.sala_actual.salidas:
+            direccion = salida.direccion
+            if direccion == "N":
+                if norte is None:
+                    norte = salida
+            elif direccion == "S":
+                if sur is None:
+                    sur = salida
+            elif direccion == "E":
+                if este is None:
+                    este = salida
+            elif direccion == "O" and oeste is None:
+                oeste = salida
 
         if self.comportamiento == "errante":
+            disponibles = Vector()
+            for salida in (norte, sur, este, oeste):
+                destino = self._destino_abierto(salida)
+                if destino is not None:
+                    disponibles.agregarValor(destino)
+
+            if len(disponibles) == 0:
+                return ("esperar", None)
+
             indice = azar.randrange(len(disponibles))
 
             return (
@@ -128,9 +136,16 @@ class Enemigo(Actor):
                 disponibles.obtenerValor(indice),
             )
 
+        # Rastreador: no necesita la lista de candidatas, solo la mejor; así no
+        # se crea un Vector en cada decisión (es el enemigo que más decide).
         mejor = None
 
-        for sala in disponibles:
+        for salida in (norte, sur, este, oeste):
+            sala = self._destino_abierto(salida)
+
+            if sala is None:
+                continue
+
             rastro = sala.tiempo_rastro
 
             if rastro < 0:
@@ -156,3 +171,13 @@ class Enemigo(Actor):
 
         return ("mover", mejor)
 
+    @staticmethod
+    def _destino_abierto(salida):
+        """Sala a la que lleva una salida abierta, o None si no existe o está cerrada."""
+        if salida is None or salida.cerrada:
+            return None
+        if salida.sala_destino is None:
+            raise RuntimeError(
+                "La salida todavía no tiene destino enlazado."
+            )
+        return salida.sala_destino

@@ -61,6 +61,10 @@ class Puntaje:
         self.tiempo_final = tiempo_final
         self.resultado = resultado
 
+    @property
+    def nombre_jugador(self):
+        return self.nombre
+
     def a_datos(self):
         """Prepara los campos para JSON."""
         return {
@@ -160,6 +164,7 @@ class TablaPuntajes:
             self._puntajes.asignarValor(indice, anterior)
 
         self._puntajes.asignarValor(posicion, copia)
+        return posicion + 1
 
     def a_datos(self):
         """Prepara los registros para JSON sin exponer los originales."""
@@ -186,6 +191,25 @@ class TablaPuntajes:
             raise ValueError(
                 "El archivo de puntajes está dañado."
             ) from error
+
+        # Formato del PR24: convertir en memoria y validar antes de escribir.
+        if isinstance(datos, dict) and 'formato_puntajes' in datos:
+            if (len(datos) != 2 or type(datos['formato_puntajes']) is not int
+                    or datos['formato_puntajes'] != 1
+                    or not isinstance(datos.get('registros'), list)):
+                raise ValueError('Formato de puntajes incompatible.')
+            registros = []
+            for original in datos['registros']:
+                if not isinstance(original, dict):
+                    raise ValueError('Registro de puntaje inválido.')
+                registro = original.copy()  # representación JSON, no índice
+                if 'nombre_jugador' not in registro or 'nombre' in registro:
+                    raise ValueError('Nombre de puntaje inválido.')
+                registro['nombre'] = registro.pop('nombre_jugador')
+                if type(registro.get('version_cripta')) is int:
+                    registro['version_cripta'] = str(registro['version_cripta'])
+                registros.append(registro)
+            datos = {'formato': 1, 'puntajes': registros}
 
         if (
             not isinstance(datos, dict)

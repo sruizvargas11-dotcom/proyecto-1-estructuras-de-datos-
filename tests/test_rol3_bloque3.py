@@ -53,6 +53,80 @@ def test_heap_consulta_limpieza_y_handle_restaurado():
         HeapMinimo().restaurarEntrada(b)
 
 
+def test_vista_ordenada_es_de_solo_lectura_y_filtra_cancelados():
+    """vista_ordenada (vista_pygame, §8.5): no muta nada. Dos heaps construidos
+    exactamente igual (misma cancelación); a uno se le llama vista_ordenada
+    varias veces de más antes de extraer. La secuencia real de extracciones
+    (incluido cualquier None de borde cuando la cancelación queda al final)
+    debe salir idéntica en ambos, porque vista_ordenada no debe alterarla."""
+    def construir():
+        h = HeapMinimo()
+        entradas = {}
+        for tiempo, secuencia in ((40, 0), (40, 1), (10, 2), (25, 3), (25, 4), (5, 5)):
+            entradas[secuencia] = h.insertarEntrada(tiempo, f't{tiempo}s{secuencia}')
+        h.invalidarEntrada(entradas[1])   # cancelada: no debe aparecer en vista_ordenada
+        return h, entradas
+
+    control, _ = construir()
+    sospechoso, entradas = construir()
+
+    contadores_antes = sospechoso.contadores()
+    vista5 = sospechoso.vista_ordenada(5)
+    vista1 = sospechoso.vista_ordenada(1)
+    vista0 = sospechoso.vista_ordenada(0)
+    assert contadores_antes == sospechoso.contadores()   # ninguna extracción real
+    assert len(vista0) == 0
+
+    esperado = sorted((e.clave(), e.dato) for e in entradas.values() if e.valido)
+    assert [(e.clave(), e.dato) for e in vista5] == esperado
+    assert [(e.clave(), e.dato) for e in vista1] == esperado[:1]
+    assert all(e.valido for e in vista5)   # nunca incluye la cancelada
+
+    # La secuencia real de extracciones no cambia por haber llamado vista_ordenada
+    # de más: el control (sin esas llamadas) y el sospechoso deben coincidir
+    # extracción a extracción, incluido el None final si la cancelación cae ahí.
+    secuencia_control, secuencia_sospechoso = [], []
+    while not control.esta_vacio():
+        secuencia_control.append(control.extraer_minimo())
+    while not sospechoso.esta_vacio():
+        secuencia_sospechoso.append(sospechoso.extraer_minimo())
+    assert secuencia_sospechoso == secuencia_control
+
+
+def test_vista_ordenada_no_copia_el_heap_entero(monkeypatch):
+    """Con n chico frente a un heap grande, visita solo unos pocos nodos: el
+    acceso a self._datos queda acotado por el resultado pedido, no por len(heap)."""
+    h = HeapMinimo()
+    for i in range(1000):
+        h.insertarEntrada(i, i)
+
+    accesos = []
+    original = h._datos.obtenerValor
+    def contado(indice):
+        accesos.append(indice)
+        return original(indice)
+    monkeypatch.setattr(h._datos, 'obtenerValor', contado)
+
+    resultado = h.vista_ordenada(5)
+    assert [e.dato for e in resultado] == [0, 1, 2, 3, 4]
+    # Cada índice visitado pertenece como mucho a un árbol pequeño alrededor de
+    # los 5 resultados (bastante menos que los 1000 nodos del heap).
+    assert len(set(accesos)) < 50
+
+
+def test_reloj_proximos_eventos_omite_actor_muerto():
+    """morir() ya cancela los eventos pendientes del actor (así que este caso no
+    ocurre en el juego real); el filtro de proximos_eventos es defensivo, así que
+    se fuerza el escenario marcando 'vivo' en False sin pasar por morir()."""
+    r = Reloj(1)
+    vivo, muerto = actor(), actor()
+    r.programar_en(10, nada, tipo='accion', dueno=vivo)
+    r.programar_en(5, nada, tipo='accion', dueno=muerto)
+    muerto.vivo = False
+    proximos = r.proximos_eventos(5)
+    assert [e.dato.dueno for e in proximos] == [vivo]
+
+
 @pytest.mark.parametrize('costo,velocidad,esperado', [(100,100,100),(100,150,66),(25,100,25),(50,100,50),(1,999999,1),(0,100,1)])
 def test_intervalo_entero(costo, velocidad, esperado):
     assert Reloj.intervalo(costo, velocidad) == esperado

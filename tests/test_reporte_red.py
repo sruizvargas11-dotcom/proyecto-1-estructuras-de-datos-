@@ -146,8 +146,9 @@ def test_main_registra_partida_y_replay(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(inicio, "ruta_bitacora_por_defecto",
                         lambda cripta_id, semilla, carpeta=None:
                         str(bitacoras / f"{cripta_id}_{semilla}.log"))
-    # Enter elige la cripta, luego esperar y salir.
-    monkeypatch.setattr("sys.stdin", io.StringIO("\nW\nQ\n"))
+    # Enter elige la cripta, Enter de nuevo deja el nombre por defecto, luego
+    # esperar y salir.
+    monkeypatch.setattr("sys.stdin", io.StringIO("\n\nW\nQ\n"))
     reportes = str(tmp_path / "reportes.txt")
     comunes = ["--offline", "--cache-dir", str(tmp_path / "cache"), "--reportes", reportes,
                "--partidas-dir", str(tmp_path / "partidas")]

@@ -1,6 +1,7 @@
 from estructuras.vector_dinamico import Vector
 from estructuras.ordenamientos import ordenar
-from modelo.deltas import DeltaAtributos, DeltaListaSimple, DeltaObjeto
+from modelo.deltas import (DeltaActivacion, DeltaAgregadoAlFinal, DeltaAtributos,
+                           DeltaListaSimple, DeltaObjeto, DeltaRetiro)
 from modelo.entorno import Entorno
 from modelo.historial import Historial
 from modelo.rastro import Rastro
@@ -78,6 +79,11 @@ class Partida:
         self.al_morir_enemigo = Vector()   # f(enemigo)
         self.al_entrar_sala = Vector()     # f(sala_anterior, sala_nueva)
         self.al_mensaje = Vector()         # f(tiempo, texto)
+        # Para la vista Pygame (cola de animaciones): vacíos si nadie se suscribe,
+        # no cambian el comportamiento de la consola. Los callbacks reciben
+        # referencias ya vivas, nunca ejecutan azar ni mutan el modelo.
+        self.al_mover_enemigo = Vector()   # f(enemigo, sala_origen, sala_destino)
+        self.al_atacar = Vector()          # f(atacante, objetivo, dano)
 
         # Función que aplica el efecto de un objeto: f(partida, objeto) -> bool.
         self.aplicar_efecto = None
@@ -160,14 +166,17 @@ class Partida:
         for enemigo in sala.enemigos_dormidos:
             orden.agregarValor(enemigo)
         ordenar(orden, comparar_instancias)
-        activados = 0
+        # Todas las listas cambian juntas (antes, dos recorridos por enemigo:
+        # O(k²) con k dormidos). Un solo delta las deja revertibles.
+        self.historial.registrar(DeltaActivacion(sala))
+        vivos = Vector()
         for enemigo in orden:
-            for lista in (sala.enemigos_dormidos, sala.enemigos_activos):
-                self.historial.registrar(DeltaListaSimple(lista, enemigo))
-            sala.enemigos_dormidos.eliminar_valor(enemigo)
-            if not enemigo.vivo:
-                continue
-            sala.enemigos_activos.insertar_al_final(enemigo)
+            if enemigo.vivo:
+                vivos.agregarValor(enemigo)
+        sala.enemigos_dormidos.conservar_primeros(0)
+        sala.enemigos_activos.insertar_varios_al_final(vivos)
+        activados = 0
+        for enemigo in vivos:
             self.historial.registrar(DeltaAtributos(enemigo, "sala_actual"))
             enemigo.sala_actual = sala
             self.reloj.programar(enemigo, COSTO_ACCION_ENEMIGO,
@@ -218,6 +227,8 @@ class Partida:
             dano = self.reloj.calcular_dano(enemigo.ataque, self.jugador.defensa)
             perdida = self.jugador.recibir_dano(dano)
             self._emitir(f"{self.nombre_enemigo(enemigo)} te ataca: -{perdida} de vida.")
+            for funcion in self.al_atacar:
+                funcion(enemigo, self.jugador, perdida)
         elif accion == "mover":
             self._mover_enemigo(enemigo, objetivo)
         self.verificar_fin()
@@ -232,16 +243,22 @@ class Partida:
 
     def _mover_enemigo(self, enemigo, destino):
         origen = enemigo.sala_actual
-        for lista in (origen.enemigos_activos, destino.enemigos_activos):
-            self.historial.registrar(DeltaListaSimple(lista, enemigo))
-        origen.enemigos_activos.eliminar_valor(enemigo)
-        destino.enemigos_activos.insertar_al_final(enemigo)
+        # Un recorrido del origen en vez de tres: con una multitud siguiendo al
+        # jugador cada movimiento recorría las dos salas enteras (ver perfilado).
+        indice = origen.enemigos_activos.eliminar_valor_y_posicion(enemigo)
+        self.historial.registrar(DeltaRetiro(origen.enemigos_activos, enemigo, indice))
+        llegada = destino.enemigos_activos
+        anterior = llegada.ultimo_nodo()
+        nodo = llegada.insertar_al_final(enemigo)
+        self.historial.registrar(DeltaAgregadoAlFinal(llegada, nodo, anterior))
         self.historial.registrar(DeltaAtributos(enemigo, "sala_actual"))
         enemigo.sala_actual = destino
         if destino is self.jugador.sala_actual:
             self._emitir(f"{self.nombre_enemigo(enemigo)} entra en la sala.")
         elif origen is self.jugador.sala_actual:
             self._emitir(f"{self.nombre_enemigo(enemigo)} sale de la sala.")
+        for funcion in self.al_mover_enemigo:
+            funcion(enemigo, origen, destino)
 
     def danar_enemigo(self, enemigo, cantidad):
         """Aplica daño ya calculado. Si muere, procesa la muerte. Devuelve la pérdida."""
@@ -293,6 +310,8 @@ class Partida:
         dano = self.reloj.calcular_dano(self.jugador.ataque, enemigo.defensa)
         perdida = enemigo.recibir_dano(dano)
         self._emitir(f"Atacas a {self.nombre_enemigo(enemigo)}: -{perdida} de vida.")
+        for funcion in self.al_atacar:
+            funcion(self.jugador, enemigo, perdida)
         if not enemigo.vivo:
             self.registrar_muerte_enemigo(enemigo)
         return perdida

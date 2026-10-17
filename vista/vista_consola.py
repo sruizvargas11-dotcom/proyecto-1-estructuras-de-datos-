@@ -116,6 +116,14 @@ class VistaConsola:
     def mostrar_inicio(self, cripta_id, semilla):
         self._escribir(f"Partida en {cripta_id} | semilla {semilla} | H para ver los comandos")
 
+    def pedir_nombre_jugador(self, defecto="Jugador"):
+        """Nombre para la tabla de puntajes (§2.12). Enter, EOF o Ctrl+C usan 'defecto'."""
+        try:
+            texto = self._leer(f"Nombre del jugador [{defecto}]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return defecto
+        return texto or defecto
+
 
     def mostrar_estado(self, partida):
         jugador = partida.jugador
