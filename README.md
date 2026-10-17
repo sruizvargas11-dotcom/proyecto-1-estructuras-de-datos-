@@ -333,6 +333,17 @@ La herramienta ejecuta el mismo guion en modo offline y con diez patrones de lat
 
 Los mensajes de la partida y del replay se comparan con sus respectivas referencias. Pueden diferir entre esos dos grupos porque la bitácora solo registra las acciones aceptadas y omite los comandos rechazados.
 
+### Ciclo de 20 ms y perfilado
+
+```console
+python -m herramientas.perfilar_ciclo                     # escalas x1, x10 y x50, 1000 ciclos
+python -m herramientas.perfilar_ciclo --escala 1 --perfil # agrega el informe de cProfile
+python -m herramientas.perfilar_ciclo --sospechosos       # un escenario por cada sospechoso del plan
+python -m herramientas.perfilar_ciclo --guardar           # deja la tabla en docs/evidencia/
+```
+
+Un ciclo va desde que el jugador confirma una acción hasta que el modelo queda listo para la siguiente decisión, incluidos los eventos de enemigos y efectos de ese intervalo y la escritura del log. Red y render quedan fuera: la cripta es sintética y vive en memoria (`FuenteSintetica`, mismo contrato que el API), y la vista no dibuja. Con semilla fija se reportan mínimo, mediana, percentil 95 y máximo, ordenados con el ordenamiento propio. Resultados y conclusiones: [perfilado del ciclo](docs/evidencia/perfilado-ciclo.md).
+
 ### Cripta de práctica
 
 Para probar comandos con estadísticas reforzadas y objetos adicionales:

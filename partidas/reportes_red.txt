@@ -1,5 +1,36 @@
 CRIPTA_REPORTES_RED v1 (más reciente primero; se guardan los últimos 50)
 
+=== Reporte de red #15 ===
+fecha: 2026-10-16 23:15:53
+modo: replay
+fuente: offline
+cripta: cripta-01
+version_cripta: fd58f7743b9e
+version_catalogo: be68d322d2f5
+semilla: 1
+bitacora: C:\Temp\pytest-of-User\pytest-6\test_replay_no_carga_pygame0\partida.log
+motivo_fin: replay completo, idéntico a la partida original; salida controlada: el jugador terminó la sesión (Q)
+estado_final: en_curso
+tiempo_final: 100
+acciones_jugador: 1
+enemigos_derrotados: 0
+-- Solicitudes de red --
+solicitudes_realizadas: 0 (offline: las lecturas locales no cuentan)
+presupuesto_solicitudes: 9
+restantes: 9
+dentro_del_presupuesto: sí
+lotes_leidos_localmente: contenido 0, catálogo 0
+-- Caché --
+esqueleto: desde caché en disco
+salas_incorporadas: 4 (4 desde disco, 0 desde la fuente)
+fichas_lru_aciertos: 11
+fichas_lru_fallos: 9
+fichas_fallos_resueltos: 9 desde disco, 0 desde la fuente
+fichas_lru: 9 en memoria de 25, 0 desalojos
+-- Precarga --
+esperas_bloqueantes: 0
+precargas_fallidas: 0
+
 === Reporte de red #14 ===
 fecha: 2026-10-16 18:42:00
 modo: replay

@@ -11,6 +11,9 @@ def entero(valor, nombre, minimo=0):
     return valor
 
 
+_FALTA = object()   # distingue "atributo ausente" de un atributo que vale None
+
+
 class Evento:
     """La función ejecutar recibe el reloj; tipo/dueno identifican el evento.
 
@@ -58,38 +61,48 @@ class Reloj:
         actor._reloj = self
 
     def programar_en(self, tiempo, ejecutar, *, tipo='efecto', dueno=None,
-                     campo=None, efecto=True):
-        """Programa un instante absoluto >= ahora. Retorna el handle del heap."""
-        entero(tiempo, 'tiempo')
+                     campo=None, efecto=True, _campos_extra=()):
+        """Programa un instante absoluto >= ahora. Retorna el handle del heap.
+
+        _campos_extra (uso interno de programar): otros atributos del dueño que
+        se guardan en el mismo delta que el handle, porque se cambian juntos.
+        """
+        if type(tiempo) is not int or tiempo < 0:
+            entero(tiempo, 'tiempo')
         if tiempo < self.tiempo_actual:
             raise ValueError('No se puede programar en el pasado.')
         if not callable(ejecutar):
             raise TypeError('El ejecutor debe ser una función que reciba el reloj.')
         if campo is not None:
-            if dueno is None or not hasattr(dueno, campo):
+            anterior = _FALTA if dueno is None else getattr(dueno, campo, _FALTA)
+            if anterior is _FALTA:
                 raise ValueError('El campo del handle debe existir en el dueño.')
-            anterior = getattr(dueno, campo)
             if anterior is not None and anterior.valido and anterior._en_heap:
                 raise ValueError('Cancela el evento anterior antes de sustituirlo.')
-        if dueno is not None and hasattr(dueno, '_reloj'):
-            if not dueno.vivo:
-                raise ValueError('No se programan eventos para actores muertos.')
-            self.vincular_actor(dueno)
+        if dueno is not None:
+            reloj_dueno = getattr(dueno, '_reloj', _FALTA)
+            if reloj_dueno is not _FALTA:
+                if not dueno.vivo:
+                    raise ValueError('No se programan eventos para actores muertos.')
+                if reloj_dueno is not self:
+                    self.vincular_actor(dueno)
         evento = Evento(ejecutar, tipo, dueno, campo, efecto)
         entrada = self.agenda.insertarEntrada(tiempo, evento)
         self.registrar((DeltaEfecto if efecto else DeltaEvento)(self, entrada, nueva=True))
         if campo is not None:
-            self.registrar(DeltaAtributos(dueno, campo))
+            self.registrar(DeltaAtributos(dueno, campo, *_campos_extra))
             setattr(dueno, campo, entrada)
-        self._sincronizar_efecto(entrada, True)
+        if efecto:
+            self._sincronizar_efecto(entrada, True)
         return entrada
 
     def programar(self, actor, costo, ejecutar):
         """Programa la próxima acción a ahora + intervalo(costo, velocidad)."""
         tiempo = self.tiempo_actual + self.intervalo(costo, actor.velocidad)
+        # Un solo delta guarda handle y tiempo_siguiente: se cambian juntos.
         entrada = self.programar_en(tiempo, ejecutar, tipo='accion', dueno=actor,
-                                    campo='evento_actual', efecto=False)
-        self.registrar(DeltaAtributos(actor, 'tiempo_siguiente'))
+                                    campo='evento_actual', efecto=False,
+                                    _campos_extra=('tiempo_siguiente',))
         actor.tiempo_siguiente = tiempo
         return entrada
 
@@ -200,7 +213,8 @@ class Reloj:
         if extraida is not entrada:
             raise RuntimeError('Se intentó retirar un evento fuera de orden.')
         entrada.valido = False
-        self._sincronizar_efecto(entrada, False)
+        if evento.efecto:
+            self._sincronizar_efecto(entrada, False)
         if evento.campo and getattr(evento.dueno, evento.campo) is entrada:
             self.registrar(DeltaAtributos(evento.dueno, evento.campo))
             setattr(evento.dueno, evento.campo, None)

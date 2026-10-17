@@ -1,0 +1,337 @@
+{
+  "meta_ms": 20.0,
+  "fecha": "2026-10-16",
+  "comando": "python -m herramientas.perfilar_ciclo  |  --sospechosos",
+  "semilla": 11,
+  "maquina": "Linux-6.18.44-fc-v139-x86_64-with-glibc2.39",
+  "python": "3.13.16",
+  "definicion": "ciclo = desde que el jugador confirma una acción hasta que el modelo queda listo para la siguiente decisión; incluye eventos de enemigos, efectos y escritura del log; excluye red y render",
+  "antes": {
+    "codigo": "rama antes del perfilado",
+    "escalas": [
+      {
+        "ciclos": 1000,
+        "min_ms": 0.429,
+        "mediana_ms": 7.316,
+        "p95_ms": 15.69,
+        "max_ms": 31.168,
+        "salas": 200,
+        "enemigos": 300,
+        "preparacion_s": 0.07,
+        "eventos_en_agenda": 155,
+        "turnos_enemigo": 206113,
+        "efectos": 27432,
+        "escala": 1
+      },
+      {
+        "ciclos": 1000,
+        "min_ms": 28.766,
+        "mediana_ms": 192.583,
+        "p95_ms": 295.047,
+        "max_ms": 372.709,
+        "salas": 2000,
+        "enemigos": 3000,
+        "preparacion_s": 1.08,
+        "eventos_en_agenda": 3464,
+        "turnos_enemigo": 3285745,
+        "efectos": 359133,
+        "escala": 10
+      },
+      {
+        "ciclos": 200,
+        "min_ms": 9.637,
+        "mediana_ms": 1516.588,
+        "p95_ms": 2066.094,
+        "max_ms": 2358.942,
+        "salas": 10000,
+        "enemigos": 15000,
+        "preparacion_s": 14.72,
+        "eventos_en_agenda": 18687,
+        "turnos_enemigo": 3319730,
+        "efectos": 359771,
+        "escala": 50
+      }
+    ],
+    "sospechosos": [
+      {
+        "escenario": "base",
+        "ciclos": 300,
+        "mediana_ms": 12.231,
+        "p95_ms": 18.455,
+        "max_ms": 22.686,
+        "preparacion_s": 0.08,
+        "descripcion": "x1: 200 salas, 300 enemigos activos"
+      },
+      {
+        "escenario": "sala_por_id",
+        "ciclos": 300,
+        "mediana_ms": 14.739,
+        "p95_ms": 21.124,
+        "max_ms": 68.18,
+        "preparacion_s": 15.82,
+        "descripcion": "cripta de 10000 salas, todas cargadas; el jugador siempre se mueve"
+      },
+      {
+        "escenario": "lru",
+        "ciclos": 300,
+        "mediana_ms": 3.165,
+        "p95_ms": 14.946,
+        "max_ms": 20.815,
+        "preparacion_s": 0.19,
+        "descripcion": "600 tipos de objeto y --cache-size 600; inventario rotando"
+      },
+      {
+        "escenario": "rastreadores",
+        "ciclos": 300,
+        "mediana_ms": 21.386,
+        "p95_ms": 31.912,
+        "max_ms": 46.486,
+        "preparacion_s": 0.05,
+        "descripcion": "300 rastreadores activos persiguiendo al jugador"
+      },
+      {
+        "escenario": "multitud",
+        "ciclos": 300,
+        "mediana_ms": 11.091,
+        "p95_ms": 18.68,
+        "max_ms": 24.066,
+        "preparacion_s": 0.02,
+        "descripcion": "300 enemigos dormidos en una sala; el jugador entra y pelea"
+      },
+      {
+        "escenario": "log",
+        "ciclos": 300,
+        "mediana_ms": 11.78,
+        "p95_ms": 18.272,
+        "max_ms": 26.444,
+        "preparacion_s": 0.15,
+        "descripcion": "x1 sin bitácora (comparar con base para aislar la escritura del log)"
+      },
+      {
+        "escenario": "pergamino",
+        "ciclos": 300,
+        "mediana_ms": 8.208,
+        "p95_ms": 12.007,
+        "max_ms": 37.029,
+        "preparacion_s": 0.14,
+        "descripcion": "x1: alterna esperar y pergamino (revertir un intervalo)"
+      }
+    ],
+    "barrido_nota": "barrido medido con heap y lista ya optimizados pero sin congelar el recolector en cada decisión",
+    "barrido": [
+      {
+        "enemigos": 300,
+        "mediana_ms": 3.86,
+        "p95_ms": 9.8,
+        "max_ms": 20.05
+      },
+      {
+        "enemigos": 450,
+        "mediana_ms": 7.1,
+        "p95_ms": 14.4,
+        "max_ms": 25.45
+      },
+      {
+        "enemigos": 600,
+        "mediana_ms": 10.54,
+        "p95_ms": 20.21,
+        "max_ms": 44.69
+      },
+      {
+        "enemigos": 900,
+        "mediana_ms": 19.25,
+        "p95_ms": 32.01,
+        "max_ms": 58.1
+      },
+      {
+        "enemigos": 1200,
+        "mediana_ms": 27.4,
+        "p95_ms": 44.41,
+        "max_ms": 78.29
+      }
+    ]
+  },
+  "despues": {
+    "escalas": [
+      {
+        "ciclos": 1000,
+        "min_ms": 0.246,
+        "mediana_ms": 3.865,
+        "p95_ms": 7.288,
+        "max_ms": 12.886,
+        "salas": 200,
+        "enemigos": 300,
+        "preparacion_s": 0.07,
+        "eventos_en_agenda": 155,
+        "turnos_enemigo": 206113,
+        "efectos": 27432,
+        "escala": 1
+      },
+      {
+        "ciclos": 1000,
+        "min_ms": 12.41,
+        "mediana_ms": 88.489,
+        "p95_ms": 122.663,
+        "max_ms": 271.159,
+        "salas": 2000,
+        "enemigos": 3000,
+        "preparacion_s": 1.14,
+        "eventos_en_agenda": 3464,
+        "turnos_enemigo": 3285745,
+        "efectos": 359133,
+        "escala": 10
+      },
+      {
+        "ciclos": 1000,
+        "min_ms": 10.136,
+        "mediana_ms": 592.436,
+        "p95_ms": 800.142,
+        "max_ms": 950.285,
+        "salas": 10000,
+        "enemigos": 15000,
+        "preparacion_s": 15.51,
+        "eventos_en_agenda": 18436,
+        "turnos_enemigo": 17027944,
+        "efectos": 1850014,
+        "escala": 50
+      }
+    ],
+    "sospechosos": [
+      {
+        "ciclos": 300,
+        "min_ms": 0.346,
+        "mediana_ms": 6.353,
+        "p95_ms": 10.492,
+        "max_ms": 18.925,
+        "preparacion_s": 0.06,
+        "agenda": 282,
+        "escenario": "base",
+        "descripcion": "x1: 200 salas, 300 enemigos activos"
+      },
+      {
+        "ciclos": 300,
+        "min_ms": 4.301,
+        "mediana_ms": 7.53,
+        "p95_ms": 11.144,
+        "max_ms": 15.61,
+        "preparacion_s": 14.5,
+        "agenda": 376,
+        "escenario": "sala_por_id",
+        "descripcion": "cripta de 10000 salas, todas cargadas; el jugador siempre se mueve"
+      },
+      {
+        "ciclos": 300,
+        "min_ms": 0.091,
+        "mediana_ms": 2.148,
+        "p95_ms": 8.117,
+        "max_ms": 11.013,
+        "preparacion_s": 0.19,
+        "agenda": 359,
+        "escenario": "lru",
+        "descripcion": "600 tipos de objeto y --cache-size 600; inventario rotando"
+      },
+      {
+        "ciclos": 300,
+        "min_ms": 4.703,
+        "mediana_ms": 9.636,
+        "p95_ms": 12.554,
+        "max_ms": 16.326,
+        "preparacion_s": 0.05,
+        "agenda": 301,
+        "escenario": "rastreadores",
+        "descripcion": "300 rastreadores activos persiguiendo al jugador"
+      },
+      {
+        "ciclos": 300,
+        "min_ms": 2.545,
+        "mediana_ms": 6.204,
+        "p95_ms": 9.115,
+        "max_ms": 11.997,
+        "preparacion_s": 0.02,
+        "agenda": 219,
+        "escenario": "multitud",
+        "descripcion": "300 enemigos dormidos en una sala; el jugador entra y pelea"
+      },
+      {
+        "ciclos": 300,
+        "min_ms": 0.245,
+        "mediana_ms": 6.118,
+        "p95_ms": 9.708,
+        "max_ms": 12.316,
+        "preparacion_s": 0.14,
+        "agenda": 282,
+        "escenario": "log",
+        "descripcion": "x1 sin bitácora (comparar con base para aislar la escritura del log)"
+      },
+      {
+        "ciclos": 300,
+        "min_ms": 0.035,
+        "mediana_ms": 3.924,
+        "p95_ms": 5.035,
+        "max_ms": 7.131,
+        "preparacion_s": 0.12,
+        "agenda": 33902,
+        "escenario": "pergamino",
+        "descripcion": "x1: alterna esperar y pergamino (revertir un intervalo)"
+      }
+    ],
+    "barrido": [
+      {
+        "ciclos": 1000,
+        "min_ms": 0.203,
+        "mediana_ms": 3.775,
+        "p95_ms": 7.098,
+        "max_ms": 9.573,
+        "salas": 200,
+        "enemigos": 300,
+        "preparacion_s": 0.12,
+        "eventos_en_agenda": 155,
+        "turnos_enemigo": 206113,
+        "efectos": 27432
+      },
+      {
+        "ciclos": 1000,
+        "min_ms": 0.326,
+        "mediana_ms": 6.436,
+        "p95_ms": 11.342,
+        "max_ms": 19.121,
+        "salas": 200,
+        "enemigos": 450,
+        "preparacion_s": 0.15,
+        "eventos_en_agenda": 254,
+        "turnos_enemigo": 332161,
+        "efectos": 43913
+      },
+      {
+        "ciclos": 1000,
+        "min_ms": 0.453,
+        "mediana_ms": 10.327,
+        "p95_ms": 17.119,
+        "max_ms": 32.523,
+        "salas": 200,
+        "enemigos": 600,
+        "preparacion_s": 0.15,
+        "eventos_en_agenda": 356,
+        "turnos_enemigo": 474531,
+        "efectos": 62662
+      },
+      {
+        "ciclos": 1000,
+        "min_ms": 0.902,
+        "mediana_ms": 16.054,
+        "p95_ms": 26.756,
+        "max_ms": 39.861,
+        "salas": 200,
+        "enemigos": 900,
+        "preparacion_s": 0.22,
+        "eventos_en_agenda": 694,
+        "turnos_enemigo": 790708,
+        "efectos": 102002
+      }
+    ]
+  },
+  "notas": [
+    "x50 'antes' se midió con 200 ciclos (1517 ms de mediana: 1000 ciclos tomaban más de 25 min); 'después' con 1000.",
+    "Ruido de la máquina: un trabajo fijo de CPU repetido 1000 veces da máximo = 1.93 x mediana."
+  ]
+}

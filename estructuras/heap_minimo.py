@@ -11,13 +11,16 @@ class _EntradaHeap:
     def __init__(self, tiempo, secuencia, dato):
         self.tiempo = tiempo
         self.secuencia = secuencia
+        # tiempo y secuencia no cambian nunca (reprogramar crea otra entrada):
+        # la clave se arma una sola vez y no en cada comparación.
+        self._clave = (tiempo, secuencia)
         self.dato = dato
         self.valido = True
         self._propietario = None
         self._en_heap = False
 
     def clave(self):
-        return (self.tiempo, self.secuencia)
+        return self._clave
 
 class HeapMinimo:
     def __init__(self):
@@ -229,49 +232,57 @@ class HeapMinimo:
     # -- operaciones internas del heap.
 
     def _quitar_raiz(self):
-        self._datos.obtenerValor(0)._en_heap = False
-        ultima_posicion = len(self._datos) - 1
-        ultimo = self._datos.obtenerValor(ultima_posicion)
-        self._datos.eliminarUltimo()
-
+        datos = self._datos.almacenamiento()
+        datos[0]._en_heap = False
+        ultimo = self._datos.eliminarUltimo()
         if len(self._datos) > 0:
-            self._datos.asignarValor(0, ultimo)
+            datos[0] = ultimo
             self._hundir(0)
 
+    # _flotar y _hundir mueven un "hueco" en lugar de intercambiar: cada nivel
+    # cuesta una escritura en vez de tres. Leen el arreglo interno del Vector
+    # porque todos los índices ya están dentro del rango.
+
     def _flotar(self, indice):
-        """
-        Flota el elemento en la posición 'indice' hasta que quede en su lugar.
-        """
+        """Flota el elemento en la posición 'indice' hasta que quede en su lugar."""
+        datos = self._datos.almacenamiento()
+        elemento = datos[indice]
+        clave = elemento._clave
+        comparaciones = 0
         while indice > 0:
-            padre = (indice - 1) // 2
-            self.contador_comparaciones += 1
-            if self._datos.obtenerValor(indice).clave() < self._datos.obtenerValor(padre).clave():
-                self._intercambiar(indice, padre)
+            padre = (indice - 1) >> 1
+            comparaciones += 1
+            if clave < datos[padre]._clave:
+                datos[indice] = datos[padre]
                 indice = padre
             else:
                 break
+        datos[indice] = elemento
+        self.contador_comparaciones += comparaciones
 
     def _hundir(self, indice):
+        datos = self._datos.almacenamiento()
         n = len(self._datos)
-
+        elemento = datos[indice]
+        clave = elemento._clave
+        comparaciones = 0
         while True:
-            izquierda = 2 * indice + 1
-            derecha = 2 * indice + 2
-            menor = indice
-
-            if izquierda < n:
-                self.contador_comparaciones += 1
-                if self._datos.obtenerValor(izquierda).clave() < self._datos.obtenerValor(menor).clave():
-                    menor = izquierda
-            if derecha < n:
-                self.contador_comparaciones += 1
-                if self._datos.obtenerValor(derecha).clave() < self._datos.obtenerValor(menor).clave():
-                    menor = derecha
-
-            if menor == indice:
+            hijo = 2 * indice + 1
+            if hijo >= n:
                 break
-            self._intercambiar(indice, menor)
-            indice = menor
+            derecha = hijo + 1
+            if derecha < n:
+                comparaciones += 1
+                if datos[derecha]._clave < datos[hijo]._clave:
+                    hijo = derecha
+            comparaciones += 1
+            if datos[hijo]._clave < clave:
+                datos[indice] = datos[hijo]
+                indice = hijo
+            else:
+                break
+        datos[indice] = elemento
+        self.contador_comparaciones += comparaciones
 
     def _intercambiar(self, i, j):
         temp = self._datos.obtenerValor(i)
