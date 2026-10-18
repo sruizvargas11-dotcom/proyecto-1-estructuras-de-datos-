@@ -5,7 +5,7 @@
 
 **Curso:** Estructuras de datos
 **Tipo de documento:** Registro de decisiones tomadas en el proyecto.
-**Fecha:** 15 de octubre de 2026.
+**Fecha:** 18 de octubre de 2026.
 
 ## Autores
 
