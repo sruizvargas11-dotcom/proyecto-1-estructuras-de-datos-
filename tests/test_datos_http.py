@@ -91,7 +91,7 @@ class TestDatosHTTP(unittest.TestCase):
 
         self.assertIsNotNone(http1.reporte()["client_id"])
         self.assertIsNotNone(http2.reporte()["client_id"])
-        self.assertNotEqual(http1.reporte()["client_id"], http2.reporte()["client_id"])
+        self.assertEqual(http1.reporte()["client_id"], http2.reporte()["client_id"])
 
 
 if __name__ == "__main__":

@@ -66,5 +66,5 @@ def test_cliente_http_nuevo_conserva_metricas_del_anterior(tmp_path):
     c._hilo=None;c._preparar_fuente_nueva_partida()
     assert c._fuente is not fuente and c._fuente.requests_realizados==0
     assert fuente.requests_realizados==9 and fuente.presupuesto==9
-    assert c._fuente._client_id!=fuente._client_id and c._fuente._max_reintentos==2
+    assert c._fuente._client_id==fuente._client_id and c._fuente._max_reintentos==2
     nuevo=c._fuente;c._preparar_fuente_nueva_partida();assert c._fuente is nuevo

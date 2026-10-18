@@ -335,7 +335,16 @@ class ControladorPygame:
     def listar_criptas(self):
         self._preparar_fuente_nueva_partida()
         respuesta = self._fuente.listar_criptas()
-        criptas=list(respuesta["criptas"])
+        if not isinstance(respuesta, dict) or not isinstance(respuesta.get('criptas'), list):
+            raise ValueError('GET /criptas: respuesta inválida; se esperaba una lista de criptas.')
+        for indice, cripta in enumerate(respuesta['criptas'], 1):
+            if (not isinstance(cripta, dict)
+                    or any(not isinstance(cripta.get(campo), str) or not cripta[campo].strip()
+                           for campo in ('id', 'nombre'))
+                    or type(cripta.get('salas')) is not int or cripta['salas'] < 1
+                    or type(cripta.get('dificultad')) is not int or cripta['dificultad'] < 0):
+                raise ValueError(f'GET /criptas: cripta #{indice} con campos inválidos o ausentes.')
+        criptas=list(respuesta['criptas'])
         with self._lock:self._criptas_disponibles=tuple(criptas)
         return criptas
 

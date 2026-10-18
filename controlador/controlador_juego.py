@@ -453,6 +453,9 @@ class ControladorJuego:
 
         Se registra en la bitácora de partida porque cambia el estado (replay).
         """
+        if self.partida.terminada:
+            self._rechazar("No puedes usar un pergamino: la partida terminó.")
+            return False
         nodo = None
         for actual in self.jugador.inventario.recorrer_desde_frente():
             if actual.valor.clase == "pergamino_retroceso":
@@ -462,9 +465,11 @@ class ControladorJuego:
             self._rechazar("No tienes pergaminos de retroceso.")
             return False
         momento = self.reloj.tiempo_actual   # la bitácora guarda cuándo se usó
+        vivos_antes = self.red.ids_enemigos_vivos()
         if not self.historial.usar_pergamino(self.jugador, nodo):
             self._rechazar("No hay acciones que deshacer.")
             return False
+        self.red.reconciliar_enemigos_revividos(vivos_antes)
         if self.bitacora is not None:
             self.bitacora.registrar(momento, "pergamino")
         self.sesion.acciones.agregarValor((momento, "pergamino"))

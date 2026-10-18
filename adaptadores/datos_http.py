@@ -8,7 +8,8 @@ import requests
 from adaptadores.fuente_datos import FuenteDeDatos
 
 BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1"
-# Cada cliente se identifica ante el servicio mediante X-Cripta-Client-Id.
+# Una identidad por ejecución, compartida por todas sus partidas y reintentos.
+CLIENT_ID_EJECUCION = str(uuid.uuid4())
 
 class DatosHTTP(FuenteDeDatos):
     """Obtiene los datos de la cripta a través de la interfaz FuenteDeDatos."""
@@ -18,7 +19,7 @@ class DatosHTTP(FuenteDeDatos):
             raise ValueError("max_reintentos debe ser un entero no negativo")
         self._max_reintentos = max_reintentos
         self._base_url = BASE_URL
-        self._client_id = str(uuid.uuid4())
+        self._client_id = CLIENT_ID_EJECUCION
         self._headers = {"X-Cripta-Client-Id": self._client_id}
         self._contador = 0
         self._presupuesto = None
@@ -26,8 +27,19 @@ class DatosHTTP(FuenteDeDatos):
 
 
     def para_nueva_partida(self):
-        """Otro cliente con presupuesto propio; conserva las métricas del anterior."""
+        """Otra partida con la misma identidad; conserva las métricas del anterior."""
         return DatosHTTP(max_reintentos=self._max_reintentos)
+
+    @staticmethod
+    def _leer_json(respuesta, ruta):
+        contexto = f'GET {ruta} (HTTP {respuesta.status_code})'
+        try:
+            datos = respuesta.json()
+        except ValueError as error:
+            raise ValueError(f'{contexto}: no se pudo interpretar la respuesta JSON.') from error
+        if not isinstance(datos, dict):
+            raise ValueError(f'{contexto}: respuesta JSON inválida; se esperaba un objeto.')
+        return datos
 
     def _get(self, ruta: str, params: dict = None) -> dict:
         """Ejecuta un GET y cuenta cada intento dentro del presupuesto disponible."""
@@ -45,18 +57,15 @@ class DatosHTTP(FuenteDeDatos):
                 raise RuntimeError(f"No se pudo consultar {ruta}: {error}") from error
 
             if respuesta.status_code == 200:
-                datos = respuesta.json()
-                if not isinstance(datos, dict):
-                    raise ValueError(f"Respuesta JSON inválida en {ruta}")
-                return datos
+                return self._leer_json(respuesta, ruta)
 
             if respuesta.status_code == 429:
                 if reintentos >= self._max_reintentos:
                     raise RuntimeError(f"GET {ruta}: el servidor sigue ocupado; límite de reintentos alcanzado.")
                 if self._presupuesto is not None and self._contador >= self._presupuesto:
                     raise RuntimeError(f"Presupuesto de solicitudes agotado al consultar GET {ruta}.")
-                datos = respuesta.json()
-                espera = datos.get("reintentar_en", 5) if isinstance(datos, dict) else None
+                datos = self._leer_json(respuesta, ruta)
+                espera = datos.get("reintentar_en", 5)
                 if type(espera) not in (int, float) or not 0 <= espera <= 60:
                     raise ValueError("Intervalo de reintento inválido o mayor de 60 segundos.")
                 time.sleep(espera)

@@ -254,6 +254,39 @@ class ControladorRed:
     def notificar_muerte_enemigo(self, enemigo):
         self._fichas.desmarcar_en_uso(enemigo.tipo_id)
 
+    def _enemigos_vivos(self):
+        for sala in self._cripta.recorrer_salas():
+            for lista in (sala.enemigos_activos, sala.enemigos_dormidos):
+                for enemigo in lista:
+                    if enemigo.vivo:
+                        yield enemigo
+
+    def ids_enemigos_vivos(self):
+        """Solo identidades para detectar resurrecciones; no copia el estado."""
+        ids = Vector()
+        for enemigo in self._enemigos_vivos():
+            ids.agregarValor(enemigo.instancia_id)
+        ordenar(ids, lambda a, b: (a > b) - (a < b))
+        return ids
+
+    def reconciliar_enemigos_revividos(self, ids_anteriores):
+        """Adquiere una referencia por revivido, sin revertir fichas ni descargas."""
+        for enemigo in self._enemigos_vivos():
+            inicio, fin = 0, len(ids_anteriores) - 1
+            while inicio <= fin:
+                medio = (inicio + fin) // 2
+                anterior = ids_anteriores.obtenerValor(medio)
+                if anterior == enemigo.instancia_id:
+                    break
+                if anterior < enemigo.instancia_id:
+                    inicio = medio + 1
+                else:
+                    fin = medio - 1
+            else:
+                # Si se desalojó al morir, resolver_catalogo la recupera de disco.
+                self.resolver_catalogo([enemigo.tipo_id])
+                self._fichas.marcar_en_uso(enemigo.tipo_id)
+
     def proteger_fichas(self, tipo_ids):
         """Marca en_uso las fichas de objetos/trampas de la sala actual e inventario."""
         self.resolver_catalogo(tipo_ids)

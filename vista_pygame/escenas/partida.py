@@ -43,6 +43,7 @@ MENSAJES_RECT = pygame.Rect(40, ALTO_LOGICO - ALTO_PANEL_MENSAJES - 20,
                             760, ALTO_PANEL_MENSAJES)
 
 COMANDOS_SIN_INDICE = ("N", "S", "E", "O", "W")
+FILAS_MENSAJES = 8
 
 
 class EscenaPartida(EscenaBase):
@@ -77,6 +78,7 @@ class EscenaPartida(EscenaBase):
         self._inventario=PanelInventario()
         self._equipo=PanelEquipo()
         self._scroll_info=0
+        self._scroll_mensajes=0
         self._max_scroll_info=0
         self._rect_info=pygame.Rect(974,405,292,110)
         self._iluminacion=IluminacionSala()
@@ -133,6 +135,12 @@ class EscenaPartida(EscenaBase):
                 self._mostrar_ayuda=False
             return
         if self.contexto.controlador.esperando_red():return
+        if evento.type==pygame.MOUSEWHEEL and MENSAJES_RECT.collidepoint(getattr(evento,'pos',(-1,-1))):
+            self._desplazar_mensajes(evento.y)
+            return
+        if evento.type==pygame.KEYDOWN and evento.key in (pygame.K_PAGEUP,pygame.K_PAGEDOWN):
+            self._desplazar_mensajes(FILAS_MENSAJES if evento.key==pygame.K_PAGEUP else -FILAS_MENSAJES)
+            return
         if evento.type==pygame.MOUSEWHEEL and self._rect_info.collidepoint(getattr(evento,'pos',(-1,-1))):
             self._scroll_info=max(0,min(self._max_scroll_info,self._scroll_info-evento.y*25))
             return
@@ -319,6 +327,7 @@ class EscenaPartida(EscenaBase):
                    getattr(e, 'texto', '').startswith(('Partida cargada:', 'Lees el pergamino:'))
                    for e in eventos):
                 self._animaciones.limpiar()
+                self._scroll_mensajes=0
                 self._estado_visual = estado
                 self._layout_minimapa = None
                 self._sala_regreso_id = None
@@ -528,10 +537,18 @@ class EscenaPartida(EscenaBase):
             PanelEquipo.texto(pantalla,assets,'Rueda aquí: efectos, salidas y turnos',
                               (self._rect_info.x+2,520),10,COLOR_TEXTO_TENUE,ancho=286)
 
+    def _desplazar_mensajes(self, cantidad):
+        maximo=max(0,len(self.contexto.controlador.mensajes())-FILAS_MENSAJES)
+        self._scroll_mensajes=max(0,min(maximo,self._scroll_mensajes+cantidad))
+
     def _dibujar_mensajes(self, pantalla, assets, controlador):
         self._paneles.dibujar(pantalla,MENSAJES_RECT)
         fuente = assets.fuente(14)
-        mensajes = controlador.mensajes()[-8:]   # las últimas caben en el panel visible
+        historial = controlador.mensajes()
+        self._scroll_mensajes=max(0,min(self._scroll_mensajes,max(0,len(historial)-FILAS_MENSAJES)))
+        fin = len(historial)-self._scroll_mensajes
+        inicio = max(0,fin-FILAS_MENSAJES)
+        mensajes = historial[inicio:fin]
         y = MENSAJES_RECT.y + 6
         for mensaje in mensajes:
             texto=str(mensaje)
@@ -539,6 +556,10 @@ class EscenaPartida(EscenaBase):
                 texto=texto[:-2]+'…'
             pantalla.blit(fuente.render(texto, True, COLOR_TEXTO), (MENSAJES_RECT.x + 8, y))
             y += 18
+        if len(historial)>FILAS_MENSAJES:
+            indicador=f'Mensajes {inicio+1}-{fin}/{len(historial)} · Rueda / RePag / AvPag'
+            pantalla.blit(assets.fuente(11).render(indicador,True,COLOR_TEXTO_TENUE),
+                          (MENSAJES_RECT.x+8,MENSAJES_RECT.bottom-20))
 
     def _dibujar_ayuda(self, pantalla, assets):
         overlay = pygame.Surface((ANCHO_LOGICO, ALTO_LOGICO), pygame.SRCALPHA)
