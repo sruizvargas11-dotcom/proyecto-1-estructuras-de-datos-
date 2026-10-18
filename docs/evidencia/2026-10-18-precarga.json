@@ -1,0 +1,523 @@
+{
+  "benchmark": "4.02 - precarga de contenido",
+  "equipo": {
+    "fecha": "2026-10-18 13:29",
+    "sistema": "Windows-10-10.0.19045-SP0",
+    "procesador": "Intel64 Family 6 Model 158 Stepping 10, GenuineIntel",
+    "nucleos": 12,
+    "python": "3.14.6",
+    "repeticiones": 5,
+    "calentamiento": 1,
+    "unidad": "mediana en ms de las repeticiones; calentamiento excluido"
+  },
+  "notas": [
+    "Criptas sintéticas en grilla lado x lado; la fuente responde con latencia 0.",
+    "ms_mediana mide solo CPU del cliente; la espera de red se estima como esperas x 400 ms (§3.4).",
+    "Camino aleatorio reproducible con semilla 42."
+  ],
+  "frecuencias": [
+    {
+      "n": 25,
+      "movimientos": 60,
+      "garantizar_contenido": 61,
+      "planificar_precarga": 61,
+      "procesar_cola": 60,
+      "salas_encoladas": 9,
+      "cola_max": 3,
+      "lotes_contenido": 3,
+      "salas_por_lote": 8.33,
+      "consultas_pertenencia": 1723,
+      "elementos_por_consulta": 5.66
+    },
+    {
+      "n": 100,
+      "movimientos": 200,
+      "garantizar_contenido": 201,
+      "planificar_precarga": 201,
+      "procesar_cola": 200,
+      "salas_encoladas": 20,
+      "cola_max": 3,
+      "lotes_contenido": 10,
+      "salas_por_lote": 10.0,
+      "consultas_pertenencia": 7176,
+      "elementos_por_consulta": 20.94
+    },
+    {
+      "n": 400,
+      "movimientos": 600,
+      "garantizar_contenido": 601,
+      "planificar_precarga": 601,
+      "procesar_cola": 600,
+      "salas_encoladas": 71,
+      "cola_max": 4,
+      "lotes_contenido": 35,
+      "salas_por_lote": 10.0,
+      "consultas_pertenencia": 22161,
+      "elementos_por_consulta": 68.67
+    }
+  ],
+  "estrategias": [
+    {
+      "n": 25,
+      "movimientos": 60,
+      "estrategia": "sin_precarga",
+      "implementada": false,
+      "ms_mediana": 82.11749978363514,
+      "solicitudes_contenido": 21,
+      "esperas": 20,
+      "espera_estimada_s": 8.0,
+      "salas_cargadas": 21,
+      "salas_visitadas": 21
+    },
+    {
+      "n": 25,
+      "movimientos": 60,
+      "estrategia": "vecinas_1_nivel",
+      "implementada": false,
+      "ms_mediana": 46.940899919718504,
+      "solicitudes_contenido": 14,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 24,
+      "salas_visitadas": 21
+    },
+    {
+      "n": 25,
+      "movimientos": 60,
+      "estrategia": "vecinas_2_niveles",
+      "implementada": false,
+      "ms_mediana": 50.44709984213114,
+      "solicitudes_contenido": 11,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 25,
+      "salas_visitadas": 21
+    },
+    {
+      "n": 25,
+      "movimientos": 60,
+      "estrategia": "vecinas_lote_lleno",
+      "implementada": true,
+      "ms_mediana": 49.76310022175312,
+      "solicitudes_contenido": 3,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 25,
+      "salas_visitadas": 21
+    },
+    {
+      "n": 25,
+      "movimientos": 60,
+      "estrategia": "mapa_completo",
+      "implementada": false,
+      "ms_mediana": 45.23500008508563,
+      "solicitudes_contenido": 3,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 25,
+      "salas_visitadas": 21
+    },
+    {
+      "n": 25,
+      "movimientos": 60,
+      "estrategia": "lote_lleno_bfs",
+      "implementada": false,
+      "ms_mediana": 44.46000000461936,
+      "solicitudes_contenido": 4,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 25,
+      "salas_visitadas": 21
+    },
+    {
+      "n": 100,
+      "movimientos": 200,
+      "estrategia": "sin_precarga",
+      "implementada": false,
+      "ms_mediana": 133.45149997621775,
+      "solicitudes_contenido": 69,
+      "esperas": 68,
+      "espera_estimada_s": 27.2,
+      "salas_cargadas": 69,
+      "salas_visitadas": 69
+    },
+    {
+      "n": 100,
+      "movimientos": 200,
+      "estrategia": "vecinas_1_nivel",
+      "implementada": false,
+      "ms_mediana": 161.6394999437034,
+      "solicitudes_contenido": 53,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 89,
+      "salas_visitadas": 69
+    },
+    {
+      "n": 100,
+      "movimientos": 200,
+      "estrategia": "vecinas_2_niveles",
+      "implementada": false,
+      "ms_mediana": 175.07850006222725,
+      "solicitudes_contenido": 47,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 96,
+      "salas_visitadas": 69
+    },
+    {
+      "n": 100,
+      "movimientos": 200,
+      "estrategia": "vecinas_lote_lleno",
+      "implementada": true,
+      "ms_mediana": 183.82810009643435,
+      "solicitudes_contenido": 10,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 100,
+      "salas_visitadas": 69
+    },
+    {
+      "n": 100,
+      "movimientos": 200,
+      "estrategia": "mapa_completo",
+      "implementada": false,
+      "ms_mediana": 173.2582999393344,
+      "solicitudes_contenido": 10,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 100,
+      "salas_visitadas": 69
+    },
+    {
+      "n": 100,
+      "movimientos": 200,
+      "estrategia": "lote_lleno_bfs",
+      "implementada": false,
+      "ms_mediana": 176.84989981353283,
+      "solicitudes_contenido": 11,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 100,
+      "salas_visitadas": 69
+    },
+    {
+      "n": 400,
+      "movimientos": 600,
+      "estrategia": "sin_precarga",
+      "implementada": false,
+      "ms_mediana": 375.8775000460446,
+      "solicitudes_contenido": 211,
+      "esperas": 210,
+      "espera_estimada_s": 84.0,
+      "salas_cargadas": 211,
+      "salas_visitadas": 211
+    },
+    {
+      "n": 400,
+      "movimientos": 600,
+      "estrategia": "vecinas_1_nivel",
+      "implementada": false,
+      "ms_mediana": 508.1244995817542,
+      "solicitudes_contenido": 166,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 289,
+      "salas_visitadas": 211
+    },
+    {
+      "n": 400,
+      "movimientos": 600,
+      "estrategia": "vecinas_2_niveles",
+      "implementada": false,
+      "ms_mediana": 640.3034999966621,
+      "solicitudes_contenido": 142,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 322,
+      "salas_visitadas": 211
+    },
+    {
+      "n": 400,
+      "movimientos": 600,
+      "estrategia": "vecinas_lote_lleno",
+      "implementada": true,
+      "ms_mediana": 689.0079998411238,
+      "solicitudes_contenido": 35,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 350,
+      "salas_visitadas": 211
+    },
+    {
+      "n": 400,
+      "movimientos": 600,
+      "estrategia": "mapa_completo",
+      "implementada": false,
+      "ms_mediana": 648.7080999650061,
+      "solicitudes_contenido": 40,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 400,
+      "salas_visitadas": 211
+    },
+    {
+      "n": 400,
+      "movimientos": 600,
+      "estrategia": "lote_lleno_bfs",
+      "implementada": false,
+      "ms_mediana": 612.2081996873021,
+      "solicitudes_contenido": 35,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 341,
+      "salas_visitadas": 211
+    }
+  ],
+  "estrategias_cripta01": [
+    {
+      "n": 6,
+      "camino": [
+        1,
+        2,
+        3,
+        4,
+        3,
+        2,
+        5
+      ],
+      "estrategia": "sin_precarga",
+      "implementada": false,
+      "solicitudes_contenido": 5,
+      "esperas": 4,
+      "espera_estimada_s": 1.6,
+      "salas_cargadas": 5
+    },
+    {
+      "n": 6,
+      "camino": [
+        1,
+        2,
+        3,
+        4,
+        3,
+        2,
+        5
+      ],
+      "estrategia": "vecinas_1_nivel",
+      "implementada": false,
+      "solicitudes_contenido": 4,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 6
+    },
+    {
+      "n": 6,
+      "camino": [
+        1,
+        2,
+        3,
+        4,
+        3,
+        2,
+        5
+      ],
+      "estrategia": "vecinas_2_niveles",
+      "implementada": false,
+      "solicitudes_contenido": 3,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 6
+    },
+    {
+      "n": 6,
+      "camino": [
+        1,
+        2,
+        3,
+        4,
+        3,
+        2,
+        5
+      ],
+      "estrategia": "vecinas_lote_lleno",
+      "implementada": true,
+      "solicitudes_contenido": 1,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 6
+    },
+    {
+      "n": 6,
+      "camino": [
+        1,
+        2,
+        3,
+        4,
+        3,
+        2,
+        5
+      ],
+      "estrategia": "mapa_completo",
+      "implementada": false,
+      "solicitudes_contenido": 1,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 6
+    },
+    {
+      "n": 6,
+      "camino": [
+        1,
+        2,
+        3,
+        4,
+        3,
+        2,
+        5
+      ],
+      "estrategia": "lote_lleno_bfs",
+      "implementada": false,
+      "solicitudes_contenido": 1,
+      "esperas": 0,
+      "espera_estimada_s": 0.0,
+      "salas_cargadas": 6
+    }
+  ],
+  "estructuras": {
+    "cola_pendientes": {
+      "descripcion": "n encolar + n desencolar",
+      "filas": [
+        {
+          "n": 10,
+          "cola_propia_ms": 0.005600042641162872,
+          "list_pop0_ms": 0.0011003576219081879
+        },
+        {
+          "n": 100,
+          "cola_propia_ms": 0.08590007200837135,
+          "list_pop0_ms": 0.008999835699796677
+        },
+        {
+          "n": 1000,
+          "cola_propia_ms": 0.5521001294255257,
+          "list_pop0_ms": 0.1205001026391983
+        },
+        {
+          "n": 10000,
+          "cola_propia_ms": 5.551900248974562,
+          "list_pop0_ms": 6.09529996290803
+        },
+        {
+          "n": 100000,
+          "cola_propia_ms": 65.32169971615076,
+          "list_pop0_ms": 913.7762999162078
+        }
+      ]
+    },
+    "pertenencia": {
+      "descripcion": "n inserciones sin duplicados + n consultas (mitad presentes)",
+      "filas": [
+        {
+          "n": 25,
+          "vector_ms": 0.07750000804662704,
+          "array_ordenado_ms": 0.18319999799132347
+        },
+        {
+          "n": 100,
+          "vector_ms": 0.9996998123824596,
+          "array_ordenado_ms": 1.886799931526184
+        },
+        {
+          "n": 400,
+          "vector_ms": 17.54359994083643,
+          "array_ordenado_ms": 20.266500301659107
+        },
+        {
+          "n": 1600,
+          "vector_ms": 269.4983999244869,
+          "array_ordenado_ms": 281.867700163275
+        }
+      ]
+    }
+  },
+  "presupuesto": {
+    "cripta": "cripta-01",
+    "presupuesto_solicitudes": 9,
+    "camino": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "casos": [
+      {
+        "caso": "caché vacía, con --cripta",
+        "solicitudes": 7,
+        "salas": [
+          {
+            "sala": 2,
+            "resultado": "ok"
+          },
+          {
+            "sala": 3,
+            "resultado": "ok"
+          },
+          {
+            "sala": 4,
+            "resultado": "ok"
+          },
+          {
+            "sala": 6,
+            "resultado": "ok"
+          }
+        ]
+      },
+      {
+        "caso": "caché vacía, listando criptas",
+        "solicitudes": 8,
+        "salas": [
+          {
+            "sala": 2,
+            "resultado": "ok"
+          },
+          {
+            "sala": 3,
+            "resultado": "ok"
+          },
+          {
+            "sala": 4,
+            "resultado": "ok"
+          },
+          {
+            "sala": 6,
+            "resultado": "ok"
+          }
+        ]
+      },
+      {
+        "caso": "caché caliente (2da partida)",
+        "solicitudes": 2,
+        "salas": [
+          {
+            "sala": 2,
+            "resultado": "ok"
+          },
+          {
+            "sala": 3,
+            "resultado": "ok"
+          },
+          {
+            "sala": 4,
+            "resultado": "ok"
+          },
+          {
+            "sala": 6,
+            "resultado": "ok"
+          }
+        ]
+      }
+    ]
+  }
+}
