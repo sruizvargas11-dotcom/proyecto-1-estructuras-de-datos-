@@ -11,7 +11,7 @@ _cache_cuadros = None
 
 def remodelar_cuenca(base, cielo):
     """Sustituye solo el cuenco antiguo, conservando la silueta original."""
-    ruta = Path(__file__).resolve().parents[2]/'assets/ui/torre_cuenca_integrada.png'
+    ruta = Path(__file__).resolve().parents[2]/'assets/ui/portada/torre_cuenca_integrada.png'
     arte = pygame.image.load(str(ruta)).convert()
     arte = pygame.transform.scale(arte,REGION.size)
     base = base.copy()

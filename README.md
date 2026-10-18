@@ -107,8 +107,11 @@ El pergamino puede revertir los cambios del jugador, enemigos y efectos incluido
 ## Vista gráfica (Pygame)
 
 ```console
+python main.py --gui
 python main.py --offline --gui
 ```
+
+El primer comando consulta la API; el segundo usa los datos descargados.
 
 `--gui` reemplaza la consola por una ventana Pygame (1280×720, 60 FPS); el resto
 de las opciones (`--offline`, `--cache-dir`, `--cache-size`, `--partidas-dir`...) se
@@ -123,11 +126,11 @@ se puede reproducir con `--replay` igual que una de consola.
 
 ### Portada (selección de cripta)
 
-La pantalla inicial de `--gui` lista las criptas que devuelve el mismo
-`controlador.listar_criptas()` que usa la consola (nada fijo en el código: funciona
-igual con 1, 4 o 15 criptas, con scroll automático si no caben). El fondo es
-`assets/ui/portada.png`; si no está presente se usa un color sólido de la paleta, sin
-romper.
+La pantalla inicial ofrece crear una partida, cargar una guardada o salir.
+Al crear una partida, se solicita un nombre y se muestran las criptas que devuelve
+la fuente de datos, con desplazamiento si no caben. Los recursos de la portada
+están en `assets/ui/portada/`. El fondo original `portada.png` se conserva como
+respaldo si no puede cargarse la portada animada.
 
 | Tecla / acción | Efecto |
 | --- | --- |
@@ -137,9 +140,10 @@ romper.
 | Enter / clic sobre una cripta | Inicia la partida con esa cripta y el nombre escrito |
 | Enter sobre el nombre | Pasa el foco a la primera cripta |
 | R | Reintentar la consulta de criptas si falló |
-| Esc | Salir del juego |
+| Esc | Volver al inicio desde la selección de cripta; salir desde el inicio |
 
-Al volver desde el fin de una partida, se regresa a esta misma pantalla.
+Al volver desde el fin de una partida, se regresa al inicio. Las partidas guardadas
+se seleccionan desde «Cargar partida».
 
 | Tecla | Acción |
 | --- | --- |
@@ -159,11 +163,15 @@ Al volver desde el fin de una partida, se regresa a esta misma pantalla.
 | F1 | Ayuda |
 | F5 | Mostrar u ocultar el minimapa |
 
-El arte, el audio y las animaciones reales están a cargo de otro rol del equipo; hasta
-que esos archivos existan, el inventario, la pausa y el fin de partida usan
-rectángulos de colores y sonido silencioso (`vista_pygame/stubs_temporales.py`),
-suficientes para jugar una partida completa de punta a punta. La portada
-(`vista_pygame/escenas/menu_criptas.py`) ya es la implementación real.
+La interfaz incluye portada animada, inventario integrado con botones y vistas
+ordenadas, animaciones de combate y trampas, y pantallas de victoria, derrota y
+estadísticas. El panel de efectos muestra veneno, cambios temporales de velocidad
+y antorchas encendidas. Los últimos 20 mensajes se recorren con la rueda sobre su
+panel o con RePág/AvPág. El sonido sigue usando `GestorAudioTemporal`, que es silencioso.
+
+Los recursos están agrupados en `assets/ui/portada/`, `assets/escenarios/<tema>/`,
+`assets/sprites/` y `assets/fuentes/`. La fuente conserva su licencia junto al archivo
+TTF. Los PNG se comprimen sin pérdida, conservando los píxeles y la transparencia.
 
 ## Opciones de ejecución
 

@@ -35,7 +35,7 @@ import sys
 import pygame
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RUTA_POR_DEFECTO = os.path.join(RAIZ, "portada.png")
+RUTA_POR_DEFECTO = os.path.join(RAIZ, "assets", "ui", "portada", "portada.png")
 
 DELTA_PLANO_MAXIMO = 6      # diferencia máxima entre píxeles vecinos para seguir "plano"
 MUESTREO_X = 2               # cada cuántos píxeles se muestrea una fila (velocidad)

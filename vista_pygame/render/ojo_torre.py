@@ -2,7 +2,7 @@
 from pathlib import Path
 import pygame
 
-RUTA = Path(__file__).resolve().parents[2] / 'assets/ui/ojo_torre_parpadeo.png'
+RUTA = Path(__file__).resolve().parents[2] / 'assets/ui/portada/ojo_torre_parpadeo.png'
 _cuadros = None
 
 

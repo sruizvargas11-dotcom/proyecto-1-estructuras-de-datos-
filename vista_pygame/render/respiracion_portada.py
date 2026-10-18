@@ -12,7 +12,7 @@ def respiracion_portada(imagen,clave,cantidad=48):
     w,h=imagen.get_size()
     # Los cuadros del arte de producción vienen precalculados. Si faltan,
     # conservamos el generador determinista como recuperación.
-    ruta=Path(__file__).resolve().parents[2]/f'assets/ui/respiracion_menu_{clave}.png'
+    ruta=Path(__file__).resolve().parents[2]/f'assets/ui/portada/respiracion_menu_{clave}.png'
     if cantidad==48:
         try:
             atlas=pygame.image.load(str(ruta)).convert_alpha()

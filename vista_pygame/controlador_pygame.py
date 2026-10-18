@@ -143,11 +143,15 @@ class EstadoPartida:
     cripta_nombre: str = ""
 
 
-def _efectos_jugador(jugador):
+def _efectos_jugador(jugador, tiempo=0):
     efectos = []
     veneno = getattr(jugador, "estado_veneno", None)
     if veneno is not None:
         efectos.append(f"envenenado ({veneno.dano_por_pulso}x{veneno.pulsos_restantes})")
+    velocidad = getattr(jugador, "evento_mod_velocidad", None)
+    if velocidad is not None and velocidad.valido and velocidad._en_heap:
+        restante = max(0, velocidad.tiempo-tiempo)
+        efectos.append(f"velocidad temporal: {jugador.velocidad} ({restante} ut)")
     for nodo in jugador.inventario.recorrer_desde_frente():
         objeto = nodo.valor
         if objeto.clase == "antorcha" and objeto.encendida:
@@ -232,7 +236,7 @@ def construir_estado(partida, proximos_turnos=None, cargando=False):
         ataque=jugador.ataque, defensa=jugador.defensa, velocidad=jugador.velocidad,
         arma_equipada=jugador.arma_equipada.nombre if jugador.arma_equipada else "",
         armadura_equipada=jugador.armadura_equipada.nombre if jugador.armadura_equipada else "",
-        inventario=inventario, efectos=_efectos_jugador(jugador),
+        inventario=inventario, efectos=_efectos_jugador(jugador, partida.tiempo),
         enemigos_derrotados=partida.enemigos_derrotados,
         acciones_jugador=partida.acciones_jugador,
         estado=partida.estado, salas_visitadas=salas_visitadas,

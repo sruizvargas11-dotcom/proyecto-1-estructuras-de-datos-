@@ -22,8 +22,8 @@ from vista_pygame.contratos import EscenaBase
 from vista_pygame.render.portada_animada import PortadaAnimada
 from vista_pygame.render.panel_mazmorra import PanelMazmorra
 
-RUTA_FONDO = "assets/ui/portada.png"
-RUTA_FONDO_LIMPIO = "assets/ui/portada_limpia.png"
+RUTA_FONDO = "assets/ui/portada/portada.png"
+RUTA_FONDO_LIMPIO = "assets/ui/portada/portada_limpia.png"
 CANDIDATOS_FUENTE_PIXEL = (
     "assets/fuentes/PressStart2P-Regular.ttf",
     "assets/fuentes/PressStart2P.ttf",
@@ -257,8 +257,8 @@ class EscenaMenuCriptas(EscenaBase):
     # -- fondo y fuentes ---------------------------------------------------
 
     def _cargar_fondo_preferido(self):
-        """assets/ui/portada_limpia.png (sin texto) si existe; si no,
-        assets/ui/portada.png; si ninguno carga, None (color sólido,
+        """assets/ui/portada/portada_limpia.png (sin texto) si existe; si no,
+        assets/ui/portada/portada.png; si ninguno carga, None (color sólido,
         nunca rompe). El booleano dice si el fondo ya viene "limpio" (sin
         texto del boceto), para no dibujar ninguna placa de cobertura."""
         disp_tamano = (round(PORTADA_REF_ANCHO * self._layout.escala),

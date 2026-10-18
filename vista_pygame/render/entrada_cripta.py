@@ -13,7 +13,7 @@ _arte=None
 def _recursos():
     global _arte
     if _arte is not None:return _arte
-    fondo=pygame.image.load(str(RAIZ/'assets/ui/entrada_cripta.png')).convert()
+    fondo=pygame.image.load(str(RAIZ/'assets/escenarios/osario/entrada.png')).convert()
     fondo=pygame.transform.scale(fondo,(1280,720))
     fondo.fill((173,184,201),special_flags=pygame.BLEND_RGB_MULT)
     # Sombra amplia en los bordes y bajo el arco, preparada una sola vez.
@@ -48,7 +48,7 @@ class EntradaCripta:
         self.tema=tema_por_cripta(cripta_id,nombre)
         self._fondo,self._pasos,self._fuegos=_recursos()
         ruta=self.tema.recurso(RAIZ/'assets','entrada')
-        if ruta!=RAIZ/'assets/ui/entrada_cripta.png':
+        if ruta!=RAIZ/'assets/escenarios/osario/entrada.png':
             self._fondo=pygame.transform.scale(pygame.image.load(str(ruta)).convert(),(1280,720))
             self._fondo.fill((173,184,201),special_flags=pygame.BLEND_RGB_MULT)
         self._menu=pygame.transform.scale(fondo_menu,(1280,720)) if fondo_menu is not None else self._fondo

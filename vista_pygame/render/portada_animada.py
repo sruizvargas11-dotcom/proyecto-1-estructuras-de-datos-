@@ -10,11 +10,11 @@ from vista_pygame.render.aura_ojo import preparar_aura
 from vista_pygame.render.integracion_ojo import preparar_integracion, remodelar_cuenca, REGION
 
 RAIZ = Path(__file__).resolve().parents[2]
-RUTA_LIMPIA = RAIZ / 'assets/ui/portada_base_v3.png'
-RUTA_PERSONAJES = RAIZ / 'assets/ui/personajes_menu_pixelart.png'
-RUTA_NUBES = RAIZ / 'assets/ui/nubes_menu.png'
-RUTA_SILUETA = RAIZ / 'assets/ui/portada_silueta.png'
-RUTA_FUEGO = RAIZ / 'assets/ui/fuego_menu_pixelart.png'
+RUTA_LIMPIA = RAIZ / 'assets/ui/portada/portada_base_v3.png'
+RUTA_PERSONAJES = RAIZ / 'assets/ui/portada/personajes_menu_pixelart.png'
+RUTA_NUBES = RAIZ / 'assets/ui/portada/nubes_menu.png'
+RUTA_SILUETA = RAIZ / 'assets/ui/portada/portada_silueta.png'
+RUTA_FUEGO = RAIZ / 'assets/ui/portada/fuego_menu_pixelart.png'
 
 # Coordenadas del arte, compartidas con el fondo incluso en ventanas no 16:9.
 BRASEROS = ((526, 108, 22, 44), (1042, 409, 15, 34),

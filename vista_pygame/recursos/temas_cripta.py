@@ -14,11 +14,9 @@ class TemaCripta:
     piedra: tuple = (46,54,64)
 
     def recurso(self,carpeta,tipo):
-        originales=(('sala','sala_sin_antorchas_suelo.png'),('final','sala_salida_luz.png'),
-                    ('entrada','entrada_cripta.png'),('exterior','salida_exterior.png'))
-        ruta=Path(carpeta)/'ui/temas'/self.clave/(tipo+'.png')
+        ruta=Path(carpeta)/'escenarios'/self.clave/(tipo+'.png')
         if ruta.is_file():return ruta
-        return Path(carpeta)/'ui'/next(archivo for nombre,archivo in originales if nombre==tipo)
+        return Path(carpeta)/'escenarios/osario'/(tipo+'.png')
 
 
 TEMAS=(

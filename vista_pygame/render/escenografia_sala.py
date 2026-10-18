@@ -16,7 +16,7 @@ def dibujar_escenario(pantalla,assets,estado,rect,tiempo,puerta):
     final=getattr(estado,'es_sala_salida',False)
     tema=tema_estado(estado)
     ruta=tema.recurso(getattr(assets,'carpeta',Path('.')),'final' if final else 'sala')
-    if not ruta.is_file():ruta=getattr(assets,'carpeta',Path('.'))/'ui/sala_detallada.png'
+    if not ruta.is_file():ruta=getattr(assets,'carpeta',Path('.'))/'escenarios/osario/sala.png'
     if not hasattr(assets,'carpeta') or not ruta.is_file():return False
     clave=(str(ruta),rect.size,estado.sala_id%3)
     fondo=next((im for k,im in _fondos if k==clave),None)

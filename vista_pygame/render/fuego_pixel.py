@@ -27,7 +27,7 @@ _cache=[]
 def cargar_llamas(ancho,alto):
     for clave,frames in _cache:
         if clave==(ancho,alto):return frames
-    atlas=pygame.image.load(str(Path(__file__).resolve().parents[2]/'assets/ui/fuego_menu_pixelart.png')).convert_alpha()
+    atlas=pygame.image.load(str(Path(__file__).resolve().parents[2]/'assets/ui/portada/fuego_menu_pixelart.png')).convert_alpha()
     frames=cuadros_llama(ancho,alto,atlas)
     _cache.append(((ancho,alto),frames))
     return frames
