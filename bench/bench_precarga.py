@@ -1,25 +1,7 @@
-"""Benchmark 4.2 — Precarga de contenido.
-
-Ejecutar directo, sin pytest, desde la raíz del proyecto:
-    python bench/bench_precarga.py
-    python bench/bench_precarga.py --salida docs/evidencia/bench_precarga.txt
-
-Mide con time.perf_counter(), 5 repeticiones por medición, reporta la mediana.
-Las criptas grandes son sintéticas (grillas lado x lado) y responden con latencia 0:
-la columna "ms" mide solo el costo de CPU del cliente. El costo de red se estima como
-esperas x ~400 ms (enunciado §3.4). Nada se escribe en partidas/: la caché va a una
-carpeta temporal que se borra al terminar.
-
-Secciones (documento 4.02):
-  A. Frecuencia de operaciones en una partida simulada        -> punto 1
-  B. Estrategias de precarga (implementada y alternativas)    -> punto 5
-  C. Estructuras: cola de pendientes y pertenencia            -> punto 5
-  D. Presupuesto de solicitudes en cripta-01 (guardia activa) -> punto 6
-"""
-
 import argparse
 import contextlib
 import io
+import json
 import os
 import platform
 import random
@@ -40,12 +22,8 @@ from estructuras.vector_dinamico import Vector
 
 REPETICIONES = 5
 GRILLAS = ((5, 60), (10, 200), (20, 600))      # (lado, movimientos): n = lado*lado salas
-LATENCIA_MS = 400                               # §3.4: ~400 ms por solicitud
+LATENCIA_MS = 400                               
 
-
-# ─────────────────────────────────────────────────────────────────────
-# Medición
-# ─────────────────────────────────────────────────────────────────────
 
 def mediana(valores):
     """Mediana con inserción propia (sin sorted ni .sort, §7)."""
@@ -75,10 +53,6 @@ def medir(accion, repeticiones=REPETICIONES):
         tiempos.append((time.perf_counter() - inicio) * 1000)
     return mediana(tiempos)
 
-
-# ─────────────────────────────────────────────────────────────────────
-# Fuentes de datos para el bench
-# ─────────────────────────────────────────────────────────────────────
 
 class FuenteGrilla:
     """Cripta sintética lado x lado; cada sala trae 1 enemigo, 1 objeto y 1 trampa."""
@@ -166,10 +140,6 @@ class FuenteConGuardia:
             return respuesta
         return envuelto
 
-
-# ─────────────────────────────────────────────────────────────────────
-# Estrategias de precarga
-# ─────────────────────────────────────────────────────────────────────
 
 class RedUnNivel(ControladorRed):
     """Alternativa: solo vecinas directas."""
@@ -277,11 +247,8 @@ def lotes_de_contenido(red):
     return tamanos
 
 
-# ─────────────────────────────────────────────────────────────────────
-# Secciones
-# ─────────────────────────────────────────────────────────────────────
-
-def seccion_frecuencias(out):
+def seccion_frecuencias(out, datos):
+    filas = datos['frecuencias'] = []
     out("A. FRECUENCIA DE OPERACIONES (estrategia implementada, vecinas y lote lleno)")
     out("   Partida simulada: camino aleatorio reproducible (semilla 42) en grillas.")
     out(f"   {'n':>5} {'movs':>5} {'garantizar':>10} {'planificar':>10} {'procesar':>9} "
@@ -321,16 +288,27 @@ def seccion_frecuencias(out):
                     red.procesar_cola()
                 lotes = lotes_de_contenido(red)
                 promedio = sum(lotes) / len(lotes) if len(lotes) else 0
+                por_consulta = cuenta['elementos'] / cuenta['consultas']
                 out(f"   {lado * lado:>5} {pasos:>5} {pasos + 1:>10} {pasos + 1:>10} {pasos:>9} "
                     f"{encoladas:>9} {cola_max:>8} {len(lotes):>6} {promedio:>10.1f} "
-                    f"{cuenta['consultas']:>11} {cuenta['elementos'] / cuenta['consultas']:>9.1f}")
+                    f"{cuenta['consultas']:>11} {por_consulta:>9.1f}")
+                filas.append({
+                    'n': lado * lado, 'movimientos': pasos,
+                    'garantizar_contenido': pasos + 1, 'planificar_precarga': pasos + 1,
+                    'procesar_cola': pasos, 'salas_encoladas': encoladas, 'cola_max': cola_max,
+                    'lotes_contenido': len(lotes), 'salas_por_lote': round(promedio, 2),
+                    'consultas_pertenencia': cuenta['consultas'],
+                    'elementos_por_consulta': round(por_consulta, 2),
+                })
     finally:
         modulo_red._contiene = original
     out("   pertenencia = consultas '¿ya está pedida/cargada/encolada?' (búsqueda lineal en Vector)")
     out("   elem/cons   = elementos revisados en promedio por consulta")
 
 
-def seccion_estrategias(out):
+def seccion_estrategias(out, datos):
+    filas = datos['estrategias'] = []
+    filas_cripta = datos['estrategias_cripta01'] = []
     out("B. ESTRATEGIAS DE PRECARGA (* = implementada)")
     out("   esperas = veces que el jugador entra a una sala aún no cargada (cada una ~400 ms de red)")
     encabezado = (f"   {'n':>5} {'estrategia':<20} {'ms(med)':>9} {'solicitudes':>11} {'esperas':>8} "
@@ -352,6 +330,13 @@ def seccion_estrategias(out):
             out(f"   {lado * lado:>5} {nombre:<20} {ms:>9.2f} {red.contador_solicitudes_contenido:>11} "
                 f"{esperas:>8} {esperas * LATENCIA_MS / 1000:>9.1f}s {len(red._incorporadas):>8} "
                 f"{visitadas:>9}")
+            filas.append({
+                'n': lado * lado, 'movimientos': pasos, 'estrategia': estrategia,
+                'implementada': nombre.endswith('*'), 'ms_mediana': ms,
+                'solicitudes_contenido': red.contador_solicitudes_contenido,
+                'esperas': esperas, 'espera_estimada_s': esperas * LATENCIA_MS / 1000,
+                'salas_cargadas': len(red._incorporadas), 'salas_visitadas': visitadas,
+            })
         out("")
     out("   cripta-01 (datos offline), camino fijo 1-2-3-4-3-2-5 (solo red; ignora llaves):")
     fuente = DatosOffline()
@@ -361,9 +346,18 @@ def seccion_estrategias(out):
             red, esperas, _ = jugar(fuente, cripta, [2, 3, 4, 3, 2, 5], nombre.rstrip('*'), clase, carpeta)
         out(f"   {6:>5} {nombre:<20} {'-':>9} {red.contador_solicitudes_contenido:>11} {esperas:>8} "
             f"{esperas * LATENCIA_MS / 1000:>9.1f}s {len(red._incorporadas):>8}")
+        filas_cripta.append({
+            'n': 6, 'camino': [1, 2, 3, 4, 3, 2, 5], 'estrategia': nombre.rstrip('*'),
+            'implementada': nombre.endswith('*'),
+            'solicitudes_contenido': red.contador_solicitudes_contenido,
+            'esperas': esperas, 'espera_estimada_s': esperas * LATENCIA_MS / 1000,
+            'salas_cargadas': len(red._incorporadas),
+        })
 
 
-def seccion_estructuras(out):
+def seccion_estructuras(out, datos):
+    filas_cola = []
+    filas_pertenencia = []
     out("C. ESTRUCTURAS")
     out("   C1. Cola de pendientes: Cola propia (lista enlazada) vs list.pop(0)")
     out(f"   {'n':>8} {'Cola propia ms':>15} {'list.pop(0) ms':>15}")
@@ -381,7 +375,9 @@ def seccion_estructuras(out):
                 lista.append(i)
             while lista:
                 lista.pop(0)
-        out(f"   {n:>8} {medir(con_cola):>15.3f} {medir(con_lista):>15.3f}")
+        ms_cola, ms_lista = medir(con_cola), medir(con_lista)
+        out(f"   {n:>8} {ms_cola:>15.3f} {ms_lista:>15.3f}")
+        filas_cola.append({'n': n, 'cola_propia_ms': ms_cola, 'list_pop0_ms': ms_lista})
 
     out("")
     out("   C2. Pertenencia '¿ya pedida?': Vector lineal (implementado) vs ArrayOrdenado binario")
@@ -408,10 +404,26 @@ def seccion_estructuras(out):
                     a.insertar(i, True)
             for c in consultas:
                 a.busqueda_binaria(c)
-        out(f"   {n:>8} {medir(con_vector):>15.3f} {medir(con_ordenado):>17.3f}")
+        ms_vector, ms_ordenado = medir(con_vector), medir(con_ordenado)
+        out(f"   {n:>8} {ms_vector:>15.3f} {ms_ordenado:>17.3f}")
+        filas_pertenencia.append({'n': n, 'vector_ms': ms_vector,
+                                        'array_ordenado_ms': ms_ordenado})
+
+    datos['estructuras'] = {
+        'cola_pendientes': {
+            'descripcion': 'n encolar + n desencolar',
+            'filas': filas_cola,
+        },
+        'pertenencia': {
+            'descripcion': 'n inserciones sin duplicados + n consultas (mitad presentes)',
+            'filas': filas_pertenencia,
+        },
+    }
 
 
-def seccion_presupuesto(out):
+def seccion_presupuesto(out, datos):
+    filas = []
+    presupuesto = None
     out("D. PRESUPUESTO EN cripta-01 (guardia igual a DatosHTTP; presupuesto = 9)")
     out("   Camino 1 -> 2 -> 3 -> 4 -> 6 (salida). Solo mide red: las llaves no se simulan.")
     with tempfile.TemporaryDirectory() as cache_a, tempfile.TemporaryDirectory() as cache_b:
@@ -426,52 +438,84 @@ def seccion_presupuesto(out):
             red = sesion.red
             cripta = red._cripta
             resultado = []
+            salas = []
             for sala_id in (2, 3, 4, 6):
                 if red.asegurar_entrada(sala_id) is not None:
                     resultado.append(f"sala {sala_id}: RECHAZADA")
+                    salas.append({'sala': sala_id, 'resultado': 'rechazada'})
                     continue
                 resultado.append(f"sala {sala_id}: ok")
+                salas.append({'sala': sala_id, 'resultado': 'ok'})
                 red.planificar_precarga(cripta.sala_por_id(sala_id))
                 red.procesar_cola()
             out(f"   {etiqueta:<32} solicitudes={fuente.solicitudes:<3} " + ", ".join(resultado))
+            presupuesto = fuente._presupuesto
+            filas.append({'caso': etiqueta, 'solicitudes': fuente.solicitudes, 'salas': salas})
+    datos['presupuesto'] = {
+        'cripta': 'cripta-01', 'presupuesto_solicitudes': presupuesto,
+        'camino': [1, 2, 3, 4, 6], 'casos': filas,
+    }
 
 
-def equipo(out):
+def datos_equipo():
+    return {
+        'fecha': f"{datetime.now():%Y-%m-%d %H:%M}",
+        'sistema': platform.platform(),
+        'procesador': platform.processor() or platform.machine(),
+        'nucleos': os.cpu_count(),
+        'python': sys.version.split()[0],
+        'repeticiones': REPETICIONES,
+        'calentamiento': 1,
+        'unidad': 'mediana en ms de las repeticiones; calentamiento excluido',
+    }
+
+
+def equipo(out, info):
     out("EQUIPO")
-    out(f"   fecha        : {datetime.now():%Y-%m-%d %H:%M}")
-    out(f"   sistema      : {platform.platform()}")
-    out(f"   procesador   : {platform.processor() or platform.machine()}")
-    out(f"   núcleos      : {os.cpu_count()}")
-    out(f"   python       : {sys.version.split()[0]}")
-    out(f"   repeticiones : {REPETICIONES} (se reporta la mediana)")
+    out(f"   fecha        : {info['fecha']}")
+    out(f"   sistema      : {info['sistema']}")
+    out(f"   procesador   : {info['procesador']}")
+    out(f"   núcleos      : {info['nucleos']}")
+    out(f"   python       : {info['python']}")
+    out(f"   repeticiones : {info['repeticiones']} (se reporta la mediana)")
 
 
 def main(argumentos=None):
     parser = argparse.ArgumentParser(description='Benchmark de precarga (4.02)')
-    parser.add_argument('--salida', help='Archivo donde guardar también la evidencia (UTF-8)')
+    parser.add_argument('--salida', help='Archivo JSON donde guardar también la evidencia (UTF-8)')
     opciones = parser.parse_args(argumentos)
-
-    lineas = []
 
     def out(texto=""):
         print(texto, flush=True)
-        lineas.append(texto)
+
+    info = datos_equipo()
+    evidencia = {
+        'benchmark': '4.02 - precarga de contenido',
+        'equipo': info,
+        'notas': [
+            'Criptas sintéticas en grilla lado x lado; la fuente responde con latencia 0.',
+            'ms_mediana mide solo CPU del cliente; la espera de red se estima como '
+            f'esperas x {LATENCIA_MS} ms (§3.4).',
+            'Camino aleatorio reproducible con semilla 42.',
+        ],
+    }
 
     out("BENCHMARK 4.2 - PRECARGA DE CONTENIDO")
     out("=" * 72)
-    equipo(out)
+    equipo(out, info)
     for seccion in (seccion_frecuencias, seccion_estrategias, seccion_estructuras,
                     seccion_presupuesto):
         out("")
         with contextlib.redirect_stderr(io.StringIO()):
-            seccion(out)
+            seccion(out, evidencia)
 
     if opciones.salida:
         carpeta = os.path.dirname(opciones.salida)
         if carpeta:
             os.makedirs(carpeta, exist_ok=True)
         with open(opciones.salida, 'w', encoding='utf-8') as archivo:
-            archivo.write("\n".join(lineas) + "\n")
+            json.dump(evidencia, archivo, ensure_ascii=False, indent=2)
+            archivo.write("\n")
         print(f"\nEvidencia guardada en {opciones.salida}")
 
 

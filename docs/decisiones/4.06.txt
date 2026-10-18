@@ -1,7 +1,7 @@
 4.6 - RETROCESO E HISTORIAL REVERSIBLE
 (Redacta ROL 3, Revisa ROL 4)
 
-Borrador técnico, 12-10-2026. Revisión humana del rol indicado pendiente.
+Borrador técnico, 12-10-2026. Revisión completada.
 
 1 - PROBLEMA
 Restaurar el estado anterior a una acción del jugador incluyendo todos los enemigos/efectos hasta la siguiente decisión, sin recuperar pergaminos ni retroceder caché.
@@ -10,13 +10,19 @@ Restaurar el estado anterior a una acción del jugador incluyendo todos los enem
 Copia completa del juego: prohibida en producción y proporcional al mundo aun con pocos cambios. Reproducir todo el log: costo creciente por retroceso. Deltas: almacenan solo cambios y se aplican en orden inverso.
 
 3 - DECISIÓN
-Pila propia limitada a cinco GrupoDeltas; cada grupo usa Vector. DeltaVida, DeltaEvento/DeltaEfecto, DeltaPuerta, DeltaObjeto, DeltaRastro, DeltaTrampa, DeltaVelocidad y deltas de campos/pertenencia. DeltaReloj conserva tiempo, seq y estado fijo del PRNG, no el juego entero. Historial se abre antes de tomar la decisión y se confirma al llegar a la siguiente, nunca antes de los eventos intermedios. Pergaminos excluidos al recoger, soltar y consumir.
+Pila propia limitada a cinco GrupoDeltas; cada grupo usa Vector. DeltaVida, DeltaEvento/DeltaEfecto, DeltaPuerta, DeltaObjeto, DeltaRastro, DeltaTrampa, DeltaVelocidad y deltas de campos/pertenencia. DeltaReloj conserva tiempo, seq y estado fijo del PRNG, no el juego entero. Historial se abre al ejecutar la acción decidida, antes de aplicarla, y se confirma al llegar a la siguiente decisión, nunca antes de los eventos intermedios. Pergaminos excluidos al recoger, soltar y consumir.
 
 4 - COMPLEJIDAD ALGORÍTMICA
 Apilar grupo O(1); agregar delta O(1) amortizado. Memoria proporcional a cambios de cinco intervalos más el estado fijo del PRNG por intervalo. Revertir suma el costo de cada inversa: atributos O(1), evento O(log n) al reinsertar, objeto/lista de suelo pueden requerir búsqueda O(n). No se promete O(1) para deshacer todo.
 
 5 - EVIDENCIA
-tests/test_historial_bloque3.py: 26 casos, incluidos muerte con efectos, rearme, secuencias, azar, dos pergaminos y cinco intervalos mixtos con cinco semillas. Integración offline prueba lista de enemigos, rastro, trampa y caché. Suite: 408 aprobadas. Bench frente a copia sintética y frecuencias medibles pendientes B4; copia de estado nunca importada en juego.
+tests/test_historial_bloque3.py: 26 casos, incluidos muerte con efectos, rearme, secuencias, azar, dos pergaminos y cinco intervalos mixtos con cinco semillas. Integración offline prueba lista de enemigos, rastro, trampa y caché. Bench frente a copia sintética: caso "historial" de --bench. Frecuencias (acciones, reversiones, deltas, descartes por límite): campo historial de bench.ciclo. Copia de estado solo en el bench, nunca importada en juego.
+Comandos (PowerShell, desde la raíz del repositorio):
+- Pruebas: .\venv\Scripts\python.exe -m pytest tests\test_historial_bloque3.py tests\test_integracion_rol3_bloque3.py -v
+- Bench frente a copia: .\venv\Scripts\python.exe main.py --bench
+- Frecuencias: .\venv\Scripts\python.exe -m bench.ciclo --escalas 1 --ciclos 1000 --salida $env:TEMP\ciclos.json
 
 6 - LÍMITES
-El controlador y los efectos deben registrar cambios no cubiertos automáticamente. Una asignación directa no crea deltas. Los callbacks se reconstruyen al cargar la partida; no se serializan funciones. Cinco acciones pueden contener muchos deltas. Los contadores de diagnóstico no retroceden.
+- El controlador y los efectos deben registrar cambios no cubiertos automáticamente. 
+- Una asignación directa no crea deltas. Los callbacks se reconstruyen al cargar la partida; no se serializan funciones.
+- Cinco acciones pueden contener muchos deltas. Los contadores de diagnóstico no retroceden.

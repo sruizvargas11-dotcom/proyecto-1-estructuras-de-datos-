@@ -1,6 +1,6 @@
 4.3 - RESOLUCIÓN DE REFERENCIAS DEL CATÁLOGO
 Redacta: rol 2. Revisa: rol 4.
-Cierre del bloque 4: 16 de octubre de 2026. Pendiente de revisión por el rol 4.
+Cierre del bloque 4: 16 de octubre de 2026. Revisión completada.
 
 1 - PROBLEMA
 Cuando el juego recibe el contenido de una sala, necesita convertir cada tipo_id en la ficha que describe al enemigo, objeto o trampa correspondiente. Esta consulta debe aprovechar las fichas que ya están cargadas para evitar descargas repetidas. Además, una ficha debe permanecer en memoria mientras alguna instancia la esté usando.
@@ -30,6 +30,12 @@ La LRU obtuvo una mediana de 3.454900 ms y 617 aciertos. La lista plana obtuvo 0
 La diferencia de aciertos tiene una explicación importante: la lista plana puede conservar las 40 claves, mientras que la LRU solo dispone de 25 espacios. Por eso, estos resultados muestran el comportamiento de dos estrategias distintas; no permiten comparar sus aciertos como si ambas aplicaran la misma política de memoria.
 
 La protección de fichas se verifica en tests/test_bloque3_catalogoLRU.py y en test_fichas_de_la_sala_actual_quedan_protegidas. Las pruebas del bloque 4 también comparan el estado y los mensajes de las partidas y sus replays con 10 patrones de latencia, además de comprobar la incorporación de lotes concurrentes.
+
+Comandos para reproducir la evidencia (PowerShell, desde la raíz del repositorio):
+- Búsquedas de la LRU frente a la lista plana (caso "cache"): .\venv\Scripts\python.exe main.py --bench
+- Contadores de la partida de ensayo con semilla 3 y los 10 patrones de latencia: .\venv\Scripts\python.exe -m herramientas.verificar_determinismo --cripta cripta-01 --guion docs\evidencia\guion-rol2.json --ensayo --salida docs\evidencia\determinismo-local.json
+- Protección de fichas: .\venv\Scripts\python.exe -m pytest tests\test_bloque3_catalogoLRU.py tests\test_controlador_juego.py::test_fichas_de_la_sala_actual_quedan_protegidas -v
+- Latencias y lotes concurrentes: .\venv\Scripts\python.exe -m pytest tests\test_rol2_bloque4.py -k "latencias or patrones" -v
 
 6 - LÍMITES
 La búsqueda lineal puede resultar costosa si se aumenta mucho la capacidad de la caché. También hay un límite funcional: si todas las fichas están protegidas, ninguna se puede retirar para abrir espacio sin incumplir la regla de conservar las fichas en uso.

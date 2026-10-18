@@ -1,22 +1,71 @@
 4.8 - BITÁCORA EN PANTALLA
 (Redacta ROL 4, Revisa ROL 2)
 
-Borrador técnico B2, 11-10-2026. Propuesta para la vista; revisión humana del rol indicado pendiente.
-
 1 - PROBLEMA
-Conservar los últimos 20 mensajes sin crecimiento ilimitado y mostrarlos del más antiguo al más reciente.
+El enunciado pide que la interfaz muestre únicamente los últimos 20 mensajes del juego, que el consumo de memoria de esta bitácora permanezca constante durante toda la partida y que agregar un mensaje no implique desplazar físicamente los 19 anteriores. Además se pide que la vista muestre los últimos 20 mensajes junto con el estado de la sala.
+Para lograrlo, el programa debe ejecutar estas operaciones sobre la bitácora de pantalla:
+- Agregar un mensaje
+- Listar del más antiguo al más reciente
+- Restaurar
 
 2 - ALTERNATIVAS
-Vector con desplazamiento al borrar el primero: O(k) por mensaje. Cola acotada con nodos: O(1) por mensaje, pero crea nodos. Array circular fijo: O(1) por mensaje y almacenamiento reutilizado.
+- Vector (o list) que desplaza al borrar el primero: al llenarse, cada mensaje nuevo mueve los 19 anteriores una posición: O(k) por mensaje. Es la alternativa que pide comparar el plan y se mide en el punto 5.
+- List de Python que crece y se muestran los últimos 20: agregar es O(1) amortizado, pero la memoria crece con cada mensaje durante toda la partida. Se descarta porque incumple la memoria constante del punto 4.8 del enunciado.
+- Cola acotada sobre nodos enlazados (Cola propia: desencolar el más antiguo y encolar el nuevo): O(1) por mensaje y sin desplazamientos, pero crea un nodo nuevo por mensaje y descarta el del más antiguo, así que el almacenamiento no se reutiliza: la cantidad de nodos vivos es constante, pero se reservan y liberan nodos todo el tiempo. El plan la listaba también para la bitácora; se descarta a favor del array circular, que reutiliza siempre el mismo arreglo. No tiene medición en el bench.
+- collections.deque(maxlen=20): resuelve el problema directamente, pero es una estructura de la biblioteca de Python y se exige implementar las estructuras propias.
+- Array circular de capacidad fija (ArrayCircular): O(1) por mensaje, sin desplazamientos y sobre el mismo arreglo de 20 posiciones toda la partida. Es la alternativa elegida.
 
 3 - DECISIÓN
-Se propone ArrayCircular(20), ya implementado y probado, para la futura vista. agregarValor sobrescribe el más antiguo al llenarse. Cola queda como alternativa funcional disponible. Esta propuesta resuelve la duplicidad del plan entre cola y array circular; no existe todavía una interfaz conectada y el equipo debe ratificar la elección.
+Se usa ArrayCircular(20) (estructuras/array_circular.py) como bitácora de pantalla en las dos vistas:
+- vista/vista_consola.py: VistaConsola._mensajes, con CAPACIDAD_MENSAJES = 20. mostrar_estado imprime los 20 mensajes debajo del estado de la sala.
+- vista_pygame/controlador_pygame.py: ControladorPygame._historial_mensajes, con CAPACIDAD_MENSAJES = 20. El modelo corre en otro hilo, así que agregar, listar y restaurar se hacen dentro de self._lock. La escena de partida (vista_pygame/escenas/partida.py) dibuja los 8 más recientes, que son los que caben en el panel.
+Funcionamiento de ArrayCircular:
+- _datos es una list de Python de tamaño fijo (el enunciado permite list como almacenamiento contiguo de bajo nivel), creada una sola vez con capacidad posiciones. _inicio indica la posición del mensaje más antiguo y _tamano cuántos hay.
+- agregarValor escribe en la posición (_inicio + _tamano) % capacidad. Si el buffer ya está lleno, esa posición es la del más antiguo: lo sobrescribe y avanza _inicio. Nunca mueve los demás elementos ni amplía el arreglo.
+- listar_en_orden recorre desde _inicio y devuelve una lista nueva con los mensajes del más antiguo al más reciente.
+- Cuenta agregados, sobrescrituras, listados y elementos listados, para las pruebas y métricas.
+- La bitácora guarda solo texto (str), no referencias a objetos del modelo, así que no retiene enemigos ni objetos ya eliminados.
+- Al cargar una partida, restaurar_mensajes crea un ArrayCircular(20) nuevo y agrega los mensajes guardados en orden.
+Esta bitácora es solo de visualización: no sustituye la bitácora de partida append-only en disco que se usa para reproducir (4.11).
 
 4 - COMPLEJIDAD ALGORÍTMICA
-Agregar O(1). Listar O(k), con k=20 como capacidad elegida. Memoria O(k), constante respecto de la cantidad total de mensajes; listar genera una copia de hasta k elementos.
+Notación: k = capacidad (20), m = mensajes agregados en toda la partida.
+- agregarValor: O(1). Una escritura y aritmética de índices, esté lleno o no; ningún desplazamiento.
+- listar_en_orden: O(k). Recorre hasta 20 posiciones y crea una lista nueva de hasta 20 elementos.
+- restaurar_mensajes: O(k), porque se guardan como máximo 20 mensajes.
+- Alternativa que desplaza: O(k) por mensaje una vez lleno; en total O(m · k), es decir (m - k) · (k - 1) movimientos. Con m = 20 000 son 19 980 · 19 = 379 620 movimientos.
+- Espacio: O(k), constante respecto de m. El arreglo de 20 posiciones se reserva una vez y se reutiliza; cada listado crea una copia temporal de hasta 20 referencias.
 
 5 - EVIDENCIA
-Pruebas de estructuras y contadores verifican orden, sobrescritura, capacidad y lectura de métricas. Suite completa: 345 aprobadas. Pendiente bench comparativo de 20 y 20 000 mensajes contra vector que desplaza, con repeticiones, medianas y equipo.
+5.1 Pruebas (tests/test_bitacora_pantalla.py, 9 pruebas)
+Cada requisito del punto 4.8 del enunciado tiene al menos una prueba:
+- Solo los últimos 20: test_la_capacidad_es_20, test_tras_varias_vueltas_quedan_los_ultimos_20_del_mas_antiguo_al_mas_nuevo (47 mensajes: quedan del 27 al 46 y hay 27 sobrescrituras), test_la_pantalla_muestra_solo_los_ultimos_20 (30 mensajes: la pantalla muestra del 10 al 29) y test_partida_larga_solo_20_mensajes_en_cada_pantalla (partida real con 60 esperas: ninguna pantalla muestra más de 20).
+- Orden del más antiguo al más reciente: test_con_menos_de_20_muestra_todos_en_orden y las anteriores.
+- Sin desplazar los 19 anteriores: test_agregar_escribe_una_sola_posicion_y_no_desplaza_las_demas (en 45 mensajes con el buffer lleno, cada uno cambia una sola posición y las otras 19 conservan el mismo objeto).
+- Memoria constante: test_el_almacenamiento_es_el_mismo_arreglo_de_20_toda_la_partida (20 000 mensajes sobre el mismo arreglo de 20) y test_la_memoria_no_crece_con_la_cantidad_de_mensajes (con tracemalloc, 100 000 mensajes ocupan menos de 4 KB más que 1 000).
+- Solo texto: test_solo_guarda_texto_sin_referencias_al_modelo.
+Resultado: 9 de 9 pruebas aprobadas en 3.53 s (pytest 9.1.1, Python 3.14.6, Windows), en el mismo equipo del punto 5.2.
+Comando utilizado (PowerShell, desde la raíz del repositorio):
+.\venv\Scripts\python.exe -m pytest tests\test_bitacora_pantalla.py -v
+
+5.2 Bench (python main.py --bench, caso "mensajes", bench/casos/mensajes.py)
+Agrega n mensajes a un buffer de 20 con cada alternativa y lista el resultado; antes de medir verifica que las dos dejan los mismos 20 mensajes. 5 repeticiones por medición, más 1 de calentamiento que no se cuenta; se reporta la mediana en ms.
+Equipo: Windows 10 (10.0.19045); procesador Intel Core i7-8750H @ 2.20 GHz (12 núcleos lógicos); 8 GB de RAM; Python 3.14.6. Fecha de la corrida: 2026-10-18 14:11.
+  n       alternativa                  mediana ms  desplazamientos
+  20      circular (usada)             0.007       0
+  20      desplazamiento (descartada)  0.001       0
+  20 000  circular (usada)             5.181       0
+  20 000  desplazamiento (descartada)  15.200      379 620
+- Con 20 mensajes el buffer no llega a llenarse y ninguna alternativa desplaza nada. El desplazamiento es más rápido (0.001 contra 0.007 ms) porque solo agrega al final de la lista, mientras el array circular calcula la posición con módulo en cada mensaje; la diferencia es de microsegundos.
+- Con 20 000 mensajes, el array circular tarda 5.181 ms contra 15.200 ms del desplazamiento: es 2.9 veces más rápido (unos 0.26 contra 0.76 µs por mensaje) y evita los 379 620 movimientos de elementos.
+Comando utilizado (PowerShell, desde la raíz del repositorio; se toman las filas del caso "mensajes", el resto de la salida corresponde a otras decisiones):
+.\venv\Scripts\python.exe main.py --bench
 
 6 - LÍMITES
-Es un buffer de visualización: no sustituye la bitácora append-only de partida, que corresponde a B3. La conexión con una vista y las mediciones finales están pendientes. No se ha creado ni cambiado una ventana en este cierre.
+- Si se necesita ver más de los últimos 20 mensajes o desplazarse hacia atrás en la historia. El buffer descarta el mensaje más antiguo al llenarse, por diseño de §4.8. Para la historia completa está la bitácora de partida en disco (4.11), no esta estructura.
+- Si la capacidad creciera mucho. listar_en_orden copia hasta k referencias en cada llamada, y Pygame lo llama en cada cuadro (hasta 60 veces por segundo): con k = 20 son como máximo 1 200 copias por segundo, un costo despreciable. Con una capacidad de miles convendría dibujar sin copiar o volver a listar solo cuando llegue un mensaje nuevo.
+- La memoria es constante en cantidad de mensajes, no en bytes. Se guardan 20 textos como máximo, pero cada uno ocupa según su largo: un mensaje muy largo ocupa más que uno corto. En la prueba con tracemalloc, con mensajes de unos 40 caracteres, 100 000 mensajes ocupan menos de 4 KB más que 1 000.
+- Con menos de 21 mensajes, el array circular no gana en tiempo: mientras el buffer no se llena, ninguna alternativa desplaza nada. La ventaja aparece desde el mensaje 21: en el punto 5.2, con 20 mensajes el desplazamiento es más rápido (0.001 contra 0.007 ms) y con 20 000 el array circular es 2.9 veces más rápido (5.181 contra 15.200 ms).
+- La vista Pygame dibuja solo los 8 más recientes de los 20, por el espacio del panel. Los otros 12 siguen en el buffer pero no se ven. Si se exige ver los 20 en la interfaz gráfica, hay que cambiar el panel en lugar de la estructura.
+- ArrayCircular no está protegido para hilos por sí mismo. En Pygame lo protege self._lock de ControladorPygame; cualquier acceso nuevo a la bitácora desde otro hilo tiene que pasar por ese candado.
+- La capacidad de 20 está escrita en tres lugares (vista_consola.CAPACIDAD_MENSAJES, controlador_pygame.CAPACIDAD_MENSAJES y config_vista.CAPACIDAD_MENSAJES_HUD). Si el enunciado cambiara la cantidad, hay que actualizar los tres.
