@@ -2,6 +2,7 @@
 suelo) y el minimapa. Solo lee el EstadoPartida/topología publicados: nunca
 toca el modelo ni decide nada del juego."""
 import pygame
+from vista_pygame.render.escenografia_sala import dibujar_escenario,posiciones_objetos,sombra_contacto,limitar_objeto_al_suelo
 
 from estructuras.cola import Cola
 from estructuras.vector_dinamico import Vector
@@ -11,7 +12,7 @@ from vista_pygame.config_vista import (
     DIRECCIONES, offset_direccion,
 )
 
-SALA_RECT = pygame.Rect(40, 40, 760, 560)
+SALA_RECT = pygame.Rect(40, 40, 760, 470)
 GROSOR_PARED = 10
 ANCHO_PUERTA = 70
 
@@ -35,18 +36,32 @@ def _color_puerta(salida):
     return COLOR_ORO if salida.tiene_llave else COLOR_PELIGRO
 
 
-def dibujar_sala(pantalla, assets, estado):
+def dibujar_sala(pantalla, assets, estado, tiempo_ms=0, puerta=None, objeto_oculto=None):
     """estado: EstadoPartida publicado por ControladorPygame."""
     pantalla.fill((12, 14, 20), SALA_RECT.inflate(80, 80))
-    pygame.draw.rect(pantalla, COLOR_PIEDRA, SALA_RECT)
-    pygame.draw.rect(pantalla, COLOR_PIEDRA_CLARA, SALA_RECT, GROSOR_PARED)
+    detallado=dibujar_escenario(pantalla,assets,estado,SALA_RECT,tiempo_ms,puerta)
+    if detallado:pass
+    elif hasattr(assets, 'texto'):
+        _dibujar_piedra(pantalla, assets)
+    else:
+        pygame.draw.rect(pantalla, COLOR_PIEDRA, SALA_RECT)
+    if not detallado:pygame.draw.rect(pantalla, COLOR_PIEDRA_CLARA, SALA_RECT, GROSOR_PARED)
 
-    for salida in estado.salidas:
+    for salida in (() if detallado else estado.salidas):
         a, b = _punto_puerta(salida.direccion)
         pygame.draw.line(pantalla, _color_puerta(salida), a, b, GROSOR_PARED + 4)
+        if hasattr(assets, 'texto'):
+            nombre = ('puerta_abierta' if not salida.cerrada else
+                      'puerta_llave' if salida.tiene_llave else 'puerta_cerrada')
+            imagen = assets.sprite_entorno(nombre)
+            centro = ((a[0]+b[0])//2, (a[1]+b[1])//2)
+            pantalla.blit(imagen, imagen.get_rect(center=centro))
 
     fuente = assets.fuente(22)
-    titulo = fuente.render(f"{estado.sala_nombre} (sala {estado.sala_id})", True, COLOR_TEXTO)
+    nombre_cripta=getattr(estado,'cripta_nombre','')
+    texto=(nombre_cripta+' · ' if nombre_cripta else '')+f'{estado.sala_nombre} (sala {estado.sala_id})'
+    while fuente.size(texto)[0]>SALA_RECT.width-32 and len(texto)>1:texto=texto[:-2]+'…'
+    titulo = fuente.render(texto, True, COLOR_TEXTO)
     pantalla.blit(titulo, (SALA_RECT.x + 16, SALA_RECT.y - 34))
 
     fuente_chica = assets.fuente(16)
@@ -57,13 +72,15 @@ def dibujar_sala(pantalla, assets, estado):
         pantalla.blit(fuente_chica.render(trampa.nombre, True, color), (x + 16, SALA_RECT.bottom - 38))
         x += 140
 
-    x = SALA_RECT.x + 24
-    for objeto in estado.objetos_suelo:
-        sprite = assets.sprite_objeto(objeto.tipo_id, objeto.clase)
-        pantalla.blit(sprite, (x, SALA_RECT.y + 24))
-        pantalla.blit(fuente_chica.render(objeto.nombre, True, COLOR_TEXTO),
-                      (x - 4, SALA_RECT.y + 24 + sprite.get_height() + 2))
-        x += sprite.get_width() + 70
+    for indice,objeto,(x,y) in posiciones_objetos(estado.objetos_suelo,estado.sala_id):
+        if objeto.instancia_id==objeto_oculto:continue
+        sprite,texto,(x,y)=presentacion_objeto(assets,indice,objeto,(x,y))
+        sombra_contacto(pantalla,(x,y+1),sprite.get_width()+10,10)
+        pantalla.blit(sprite,sprite.get_rect(midbottom=(x,y)))
+        pantalla.blit(texto,texto.get_rect(midtop=(x,y+4)))
+    if len(estado.objetos_suelo)>12:
+        texto=f'+{len(estado.objetos_suelo)-12} objetos (R para recoger)'
+        pantalla.blit(fuente_chica.render(texto,False,COLOR_ORO),(60,165))
 
     if estado.cargando:
         overlay = pygame.Surface(SALA_RECT.size, pygame.SRCALPHA)
@@ -71,6 +88,18 @@ def dibujar_sala(pantalla, assets, estado):
         pantalla.blit(overlay, SALA_RECT.topleft)
         texto = assets.fuente(28).render("Cargando la siguiente sala...", True, COLOR_ORO)
         pantalla.blit(texto, texto.get_rect(center=SALA_RECT.center))
+
+
+
+def presentacion_objeto(assets,indice,objeto,punto):
+    sprite=assets.sprite_objeto(objeto.tipo_id,objeto.clase)
+    fuente=assets.fuente(16)
+    nombre=f'{indice}: {objeto.nombre}'
+    while fuente.size(nombre)[0]>116 and len(nombre)>3:
+        nombre=nombre[:-2].rstrip('.')+'…'
+    texto=fuente.render(nombre,False,COLOR_TEXTO)
+    punto=limitar_objeto_al_suelo(punto,sprite.get_size(),texto.get_size())
+    return sprite,texto,punto
 
 
 # ---------------------------------------------------------------------------
@@ -117,19 +146,44 @@ def calcular_layout_minimapa(topologia, sala_inicial_id):
 
 
 def dibujar_minimapa(pantalla, rect, layout, salas_visitadas, sala_actual_id, fuente):
+    """Ventana sobre el mapa: sigue al jugador y nunca pinta fuera del panel."""
     pygame.draw.rect(pantalla, COLOR_METAL_OSCURO, rect)
+    if layout:
+        actual=next(((x,y) for sid,x,y in layout if sid==sala_actual_id),None)
+        if actual is None:actual=layout[0][1:]
+        interior=rect.inflate(-8,-8)
+        clip_anterior=pantalla.get_clip()
+        pantalla.set_clip(clip_anterior.clip(interior))
+        try:
+            lado=CELDA_MINIMAPA-2
+            for sala_id,x,y in layout:
+                px=rect.centerx+(x-actual[0])*CELDA_MINIMAPA-lado//2
+                py=rect.centery+(y-actual[1])*CELDA_MINIMAPA-lado//2
+                celda=pygame.Rect(px,py,lado,lado)
+                if not interior.colliderect(celda):continue
+                visitada=sala_id in salas_visitadas
+                color=COLOR_ORO if sala_id==sala_actual_id else (
+                    (150,150,160) if visitada else (50,50,58))
+                pygame.draw.rect(pantalla,color,celda)
+        finally:
+            pantalla.set_clip(clip_anterior)
     pygame.draw.rect(pantalla, COLOR_METAL, rect, 2)
-    if not layout:
-        return
-    xs = [x for _, x, _ in layout]
-    ys = [y for _, _, y in layout]
-    minx, miny = min(xs), min(ys)
-    cx = rect.centerx - ((max(xs) - minx) * CELDA_MINIMAPA) // 2
-    cy = rect.centery - ((max(ys) - miny) * CELDA_MINIMAPA) // 2
-    for sala_id, x, y in layout:
-        px = cx + (x - minx) * CELDA_MINIMAPA
-        py = cy + (y - miny) * CELDA_MINIMAPA
-        visitada = sala_id in salas_visitadas
-        color = COLOR_ORO if sala_id == sala_actual_id else (
-            (150, 150, 160) if visitada else (50, 50, 58))
-        pygame.draw.rect(pantalla, color, (px, py, CELDA_MINIMAPA - 2, CELDA_MINIMAPA - 2))
+
+
+_FONDO_PIEDRA = None
+_ASSETS_FONDO = None
+
+
+def _dibujar_piedra(pantalla, assets):
+    global _FONDO_PIEDRA, _ASSETS_FONDO
+    if _ASSETS_FONDO is not assets:
+        _ASSETS_FONDO = assets
+        _FONDO_PIEDRA = pygame.Surface(SALA_RECT.size)
+        _FONDO_PIEDRA.fill(COLOR_PIEDRA)
+        for y in range(0, SALA_RECT.height, 64):
+            for x in range(0, SALA_RECT.width, 64):
+                nombre = 'suelo_veta' if (x//64 + y//64)%5 == 0 else 'suelo_piedra'
+                _FONDO_PIEDRA.blit(assets.sprite_entorno(nombre), (x,y))
+        for x in range(0, SALA_RECT.width, 64):
+            _FONDO_PIEDRA.blit(assets.sprite_entorno('pared'), (x,0))
+    pantalla.blit(_FONDO_PIEDRA, SALA_RECT.topleft)

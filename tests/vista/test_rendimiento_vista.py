@@ -11,6 +11,8 @@ import pytest
 from adaptadores.datos_offline import DatosOffline
 from controlador.inicio_partida import nueva_partida
 from herramientas.generar_cripta_prueba import generar
+from bench.ciclo import PuertoMedicion, ejecutar_intervalo
+from controlador.controlador_juego import ControladorJuego
 from vista_pygame.controlador_pygame import ActorVisual, EstadoPartida, SalidaVisual
 from vista_pygame.render.render_actores import dibujar_enemigos, dibujar_jugador
 from vista_pygame.render.render_sala import dibujar_sala
@@ -29,26 +31,24 @@ def _sesion_con_movimiento(tmp_path):
 @pytest.mark.rendimiento
 def test_ciclo_del_modelo_bajo_20ms_promedio_y_peor_caso(tmp_path):
     sesion = _sesion_con_movimiento(tmp_path)
-    partida, reloj, jugador = sesion.partida, sesion.partida.reloj, sesion.partida.jugador
-
+    class PuertoMovimiento(PuertoMedicion):
+        def leer_comando(self):
+            return 'S' if sesion.partida.jugador.sala_actual.id == 2 else 'N'
+    # Carga previa fuera del cronómetro: no mezclar E/S con el presupuesto del motor.
+    sesion.red.garantizar_contenido(2)
+    controlador = ControladorJuego(sesion, PuertoMovimiento())
     duraciones = []
-    objetivo = partida.cripta.sala_por_id(2)
-    for _ in range(20):
-        reloj.avanzar_hasta_turno(jugador)
-        partida.historial.iniciar_accion(reloj)
-        inicio = time.perf_counter()
-        reloj.tomar_turno(jugador)
-        if jugador.sala_actual.id == objetivo.id:
-            partida.entrar_a_sala(partida.cripta.sala_por_id(1))
-        else:
-            partida.entrar_a_sala(objetivo)
-        partida.contar_accion_jugador()
-        if jugador.vivo and not partida.terminada:
-            partida.programar_siguiente_jugador(100)
-        duraciones.append((time.perf_counter() - inicio) * 1000)
-        partida.historial.confirmar_accion()
-        if partida.terminada:
-            break
+    try:
+        for _ in range(20):
+            inicio = time.perf_counter()
+            # Incluye acción, enemigos y efectos hasta la siguiente decisión.
+            ejecutar_intervalo(controlador)
+            duraciones.append((time.perf_counter() - inicio) * 1000)
+        assert controlador.contador_turnos_enemigo > 0
+        assert controlador.contador_efectos > 0
+        assert sesion.partida.acciones_jugador == 20
+    finally:
+        controlador._cerrar(False)
 
     assert duraciones
     promedio = sum(duraciones) / len(duraciones)

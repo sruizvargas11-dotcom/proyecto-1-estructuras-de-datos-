@@ -125,7 +125,7 @@ def reproducir(ruta_log, fuente, carpeta_cache=None, escribir=None, cache_size=2
     acciones = bitacora.leer_acciones()
     cierre_original = bitacora.leer_cierre()
     permitidas = ('mover', 'atacar', 'esperar', 'recoger', 'soltar',
-                 'equipar', 'usar', 'abrir', 'pergamino')
+                 'equipar', 'desequipar', 'apagar', 'usar', 'abrir', 'pergamino')
     for tiempo, accion in acciones:
         if accion.split(' ')[0] not in permitidas:
             raise ErrorReplayDivergente('Bitácora con acción no reproducible.')

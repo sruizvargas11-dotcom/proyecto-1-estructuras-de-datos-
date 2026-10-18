@@ -131,6 +131,7 @@ def test_flechas_mueven_entre_criptas_con_wraparound():
 
 def test_enter_en_nombre_pasa_el_foco_a_la_primera_cripta():
     escena, _, _ = _crear(_criptas(2))
+    escena._nombre = "Ana"
     assert escena._foco == -1
     escena.manejar_evento(_tecla(pygame.K_RETURN))
     assert escena._foco == 0
@@ -153,6 +154,7 @@ def test_enter_sobre_la_cripta_k_llama_iniciar_partida_con_su_id_y_el_nombre():
 
 def test_doble_enter_rapido_inicia_solo_una_partida():
     escena, _, controlador = _crear(_criptas(3))
+    escena._nombre = "Ana"
     escena._foco = 0
 
     escena.manejar_evento(_tecla(pygame.K_RETURN))
@@ -163,12 +165,13 @@ def test_doble_enter_rapido_inicia_solo_una_partida():
 
 def test_clic_sobre_una_cripta_tambien_inicia_la_partida():
     escena, _, controlador = _crear(_criptas(2))
+    escena._nombre = "Ana"
     rect = escena._rect_fila_pantalla(1)
     evento = pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=rect.center, button=1)
 
     escena.manejar_evento(evento)
 
-    assert controlador.llamadas_iniciar == [("cripta-1", "Jugador", None)]
+    assert controlador.llamadas_iniciar == [("cripta-1", "Ana", None)]
 
 
 # -- edición del nombre ---------------------------------------------------
@@ -325,6 +328,7 @@ def test_hilo_de_listar_criptas_termina_antes_de_iniciar_partida(tmp_path):
     assert hilo_de_listar != threading.get_ident()   # corrió en otro hilo, no el de la prueba
 
     llamadas_antes = len(fuente.llamadas)
+    escena._nombre = "Ada"
     escena._foco = 0
     escena.manejar_evento(_tecla(pygame.K_RETURN))   # dispara iniciar_partida
 
@@ -383,11 +387,14 @@ def test_escribir_con_nombre_por_defecto_tras_tab_tambien_lo_reemplaza():
 
 
 @pytest.mark.parametrize("cantidad", [1, 4, 15])
-def test_placas_reales_cubren_el_rectangulo_medido_sin_portada_limpia(cantidad, _pantalla_prueba):
+def test_placas_reales_cubren_el_rectangulo_medido_sin_portada_limpia(cantidad, _pantalla_prueba, monkeypatch):
     """Sin portada_limpia.png, las primeras 4 filas (reales o, si hay menos
     criptas, placas vacías de relleno) deben cubrir POR COMPLETO el
     rectángulo medido sobre portada.png — nunca dejar asomar la placa
     pintada, sea cual sea la cantidad real de criptas."""
+    from types import SimpleNamespace
+    import vista_pygame.escenas.menu_criptas as modulo
+    monkeypatch.setattr(modulo,'PortadaAnimada',lambda:SimpleNamespace(disponible=False,actualizar=lambda dt:None))
     escena, _, _ = _crear(_criptas(cantidad))
     assert escena._fondo_limpio is False
     escena.dibujar(_pantalla_prueba)

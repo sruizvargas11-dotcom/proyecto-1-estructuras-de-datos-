@@ -31,5 +31,8 @@ class Antorcha(Objeto):
         self.duracion = duracion
         self.encendida = False
         self.evento_apagado = None
+        # Una instancia contiene una unidad de uso (§2.7). Alternar la llama
+        # durante ese uso no añade combustible ni reinicia el vencimiento.
+        self.usos_restantes = 1
 
 

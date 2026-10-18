@@ -25,6 +25,10 @@ class DatosHTTP(FuenteDeDatos):
 
 
 
+    def para_nueva_partida(self):
+        """Otro cliente con presupuesto propio; conserva las métricas del anterior."""
+        return DatosHTTP(max_reintentos=self._max_reintentos)
+
     def _get(self, ruta: str, params: dict = None) -> dict:
         """Ejecuta un GET y cuenta cada intento dentro del presupuesto disponible."""
         reintentos = 0

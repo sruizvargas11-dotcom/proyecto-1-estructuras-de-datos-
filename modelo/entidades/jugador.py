@@ -187,6 +187,22 @@ class Jugador(Actor):
 
         return True
 
+    def desequipar_nodo(self, nodo):
+        """Retira solo la bonificación; conserva el nodo y el orden real."""
+        if not self.inventario.pertenece(nodo):
+            raise ValueError("El nodo no pertenece al inventario o ya fue retirado.")
+        objeto = nodo.valor
+        if objeto is not self.arma_equipada and objeto is not self.armadura_equipada:
+            return False
+        self._registrar_delta(DeltaObjeto(self, objeto, nodo))
+        if objeto is self.arma_equipada:
+            self.ataque -= objeto.ataque_bonus
+            self.arma_equipada = None
+        if objeto is self.armadura_equipada:
+            self.defensa -= objeto.defensa_bonus
+            self.armadura_equipada = None
+        return True
+
     def equipar(self, instancia_id):
         """Localiza el objeto por ID y trata de equiparlo."""
         nodo = self.buscar_nodo(instancia_id)

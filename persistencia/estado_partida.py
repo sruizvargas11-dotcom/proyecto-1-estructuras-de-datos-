@@ -32,7 +32,7 @@ MODULOS = (
     'modelo.entidades.objetos.fabrica_objetos',
 )
 OMITIDOS_PARTIDA = ('al_mensaje', 'al_morir_enemigo', 'al_entrar_sala',
-                    'al_mover_enemigo', 'al_atacar',
+                    'al_mover_enemigo', 'al_atacar', 'al_activar_trampa',
                     '_resolver_ficha', 'aplicar_efecto')
 
 

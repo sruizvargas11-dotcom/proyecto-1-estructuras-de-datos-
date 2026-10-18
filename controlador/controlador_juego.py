@@ -1,5 +1,6 @@
 
 from controlador.estado_final import lineas_estado
+from modelo.efectos import apagar_antorcha
 from controlador.narrador_eventos import describir_evento
 from estructuras.vector_dinamico import Vector
 from modelo.entidades.enemigo import Enemigo
@@ -28,6 +29,8 @@ _ALIAS = (
     ("R", "recoger"), ("RECOGER", "recoger"),
     ("T", "soltar"), ("SOLTAR", "soltar"),
     ("EQ", "equipar"), ("EQUIPAR", "equipar"),
+    ("DEQ", "desequipar"), ("DESEQUIPAR", "desequipar"),
+    ("AP", "apagar"), ("APAGAR", "apagar"),
     ("U", "usar"), ("USAR", "usar"),
     ("AB", "abrir"), ("ABRIR", "abrir"),
     ("P", "pergamino"), ("PERGAMINO", "pergamino"),
@@ -87,7 +90,7 @@ def interpretar(texto):
         if not resto or resto[0].upper() not in DIRECCIONES:
             return None, "Indica qué puerta abrir: AB N, AB S, AB E o AB O."
         return Comando("abrir", resto[0].upper()), None
-    if nombre in ("atacar", "recoger", "soltar", "equipar", "usar"):
+    if nombre in ("atacar", "recoger", "soltar", "equipar", "desequipar", "apagar", "usar"):
         if not resto:
             return Comando(nombre, 1), None
         try:
@@ -316,13 +319,18 @@ class ControladorJuego:
                 return "Inventario lleno: suelta un objeto primero (T <n>)."
             return None
 
-        if nombre in ("soltar", "equipar", "usar"):
+        if nombre in ("soltar", "equipar", "desequipar", "apagar", "usar"):
             nodo = _nodo_inventario(self.jugador, arg)
             if nodo is None:
                 return f"No existe el objeto {arg} en el inventario."
             objeto = nodo.valor
             if nombre == "equipar" and not isinstance(objeto, (Arma, Armadura)):
                 return "Solo se pueden equipar armas o armaduras."
+            if nombre == "desequipar" and objeto not in (self.jugador.arma_equipada, self.jugador.armadura_equipada):
+                return "Ese objeto no está equipado."
+            if nombre == "apagar":
+                if objeto.clase != "antorcha":return "Solo se pueden apagar antorchas."
+                if not objeto.encendida:return "Esa antorcha ya está apagada."
             if nombre == "usar":
                 return self._validar_uso(objeto)
             return None
@@ -338,6 +346,12 @@ class ControladorJuego:
             if objeto.modificador_velocidad and (type(nueva) is not int or nueva < 1):
                 return "La poción no produce una velocidad entera positiva válida."
             return None
+        if objeto.clase == "antorcha":
+            if objeto.encendida:return "Esa antorcha ya está encendida."
+            entrada = objeto.evento_apagado
+            pendiente = entrada is not None and entrada.valido and entrada._en_heap
+            if not pendiente and getattr(objeto, 'usos_restantes', 1) <= 0:
+                return "Esa antorcha está agotada."
         if objeto.clase == "pergamino_retroceso":
             return "El pergamino se usa con P."
         if objeto.clase == "llave":
@@ -406,6 +420,19 @@ class ControladorJuego:
                 return None
             self.vista.agregar_mensaje(self.reloj.tiempo_actual, f"Equipas {nodo.valor.nombre}.")
             return COSTO_EQUIPAR
+
+        if nombre == "desequipar":
+            nodo = _nodo_inventario(self.jugador, arg)
+            if not self.jugador.desequipar_nodo(nodo):return None
+            self.vista.agregar_mensaje(self.reloj.tiempo_actual, f"Desequipas {nodo.valor.nombre}.")
+            # Decisión de interfaz: quitar equipo tiene el mismo coste que ponerlo.
+            return COSTO_EQUIPAR
+
+        if nombre == "apagar":
+            objeto = _nodo_inventario(self.jugador, arg).valor
+            if not apagar_antorcha(self.reloj, objeto):return None
+            self.vista.agregar_mensaje(self.reloj.tiempo_actual, f"Apagas {objeto.nombre}.")
+            return COSTO_USAR
 
         if nombre == "usar":
             nodo = _nodo_inventario(self.jugador, arg)

@@ -18,6 +18,9 @@ AYUDA = """Comandos (no distingue mayúsculas; [n] es opcional y vale 1 por defe
   IS / IA / IC           siguiente / anterior / consultar objeto
   G [ruta]               guardar partida    L [ruta] cargar partida
   H                      esta ayuda                    Q   salir
+
+  DEQ <n>  desequipar sin soltar (costo 50)
+  AP <n>   apagar antorcha (costo 50; no reinicia su duración)
 """
 
 

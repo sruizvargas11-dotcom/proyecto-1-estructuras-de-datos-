@@ -53,8 +53,8 @@ CAPACIDAD_MENSAJES_HUD = 20  # igual que la consola (ArrayCircular)
 
 MAX_ENEMIGOS_VISIBLES = 6
 SLOTS_ENEMIGOS = (
-    (560, 260), (720, 260), (880, 260),
-    (560, 420), (720, 420), (880, 420),
+    (430, 185), (550, 185), (670, 185),
+    (430, 330), (550, 330), (670, 330),
 )
 
 # -- Minimapa: offset en celdas por dirección (el modelo no tiene
