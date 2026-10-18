@@ -12,7 +12,7 @@ from adaptadores.datos_offline import DatosOffline
 from herramientas.generar_cripta_prueba import generar
 from persistencia.puntajes import RegistroPuntaje, TablaPuntajes
 from vista_pygame.contratos import FilaPuntaje
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 
 TIMEOUT = 15
 COMANDOS_VICTORIA = ["N", "N", "N", "R", "AB E", "E"]

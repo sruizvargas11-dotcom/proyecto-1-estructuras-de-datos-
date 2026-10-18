@@ -21,7 +21,7 @@ El proyecto utiliza estructuras de datos propias para resolver problemas del jue
 
 ## Instalación
 
-El entorno de referencia es **Python 3.12**. La última validación local se realizó con Python 3.12.14 en Windows 11. Las dependencias están en [requirements.txt](requirements.txt): `requests` para el acceso HTTP y `pytest` para las pruebas. No hace falta configurar una base de datos.
+El entorno de referencia es **Python 3.12**. La última validación local se realizó con Python 3.12.14 en Windows 11. Las dependencias están en [requirements.txt](requirements.txt): `requests` para el acceso HTTP, `pytest` para las pruebas y `pygame` para la vista gráfica (`--gui`). No hace falta configurar una base de datos.
 
 Clona el repositorio y entra en su carpeta:
 
@@ -104,6 +104,75 @@ Los comandos aceptan mayúsculas y minúsculas. Los índices empiezan en 1; si u
 
 El pergamino puede revertir los cambios del jugador, enemigos y efectos incluidos en el último intervalo registrado. El historial conserva hasta cinco intervalos. El propio pergamino se consume de forma irreversible y no genera una nueva acción que pueda deshacerse.
 
+## Vista gráfica (Pygame)
+
+```console
+python main.py --gui
+python main.py --offline --gui
+```
+
+El primer comando consulta la API; el segundo usa los datos descargados.
+
+`--gui` reemplaza la consola por una ventana Pygame (1280×720, 60 FPS); el resto
+de las opciones (`--offline`, `--cache-dir`, `--cache-size`, `--partidas-dir`...) se
+aplican igual. `--gui` no se puede combinar con `--replay`, `--bench` ni
+`--solo-mapa`: esos modos nunca cargan pygame (ver [vista_pygame/](vista_pygame/) y
+[ANALISIS_ARQUITECTURA.md](ANALISIS_ARQUITECTURA.md)).
+
+El modelo del juego es exactamente el mismo que usa la consola: corre en un hilo de
+fondo detrás de un controlador que traduce las teclas a los mismos comandos de texto
+(`N`, `A`, `W`...), así que una partida jugada desde la GUI genera la misma bitácora y
+se puede reproducir con `--replay` igual que una de consola.
+
+### Portada (selección de cripta)
+
+La pantalla inicial ofrece crear una partida, cargar una guardada o salir.
+Al crear una partida, se solicita un nombre y se muestran las criptas que devuelve
+la fuente de datos, con desplazamiento si no caben. Los recursos de la portada
+están en `assets/ui/portada/`. El fondo original `portada.png` se conserva como
+respaldo si no puede cargarse la portada animada.
+
+| Tecla / acción | Efecto |
+| --- | --- |
+| Escribir / Retroceso | Edita el nombre del jugador (máx. 20 caracteres) cuando tiene el foco |
+| Tab / Shift+Tab | Siguiente/anterior elemento: nombre → criptas → nombre |
+| Flechas ↑ / ↓ | Moverse entre criptas |
+| Enter / clic sobre una cripta | Inicia la partida con esa cripta y el nombre escrito |
+| Enter sobre el nombre | Pasa el foco a la primera cripta |
+| R | Reintentar la consulta de criptas si falló |
+| Esc | Volver al inicio desde la selección de cripta; salir desde el inicio |
+
+Al volver desde el fin de una partida, se regresa al inicio. Las partidas guardadas
+se seleccionan desde «Cargar partida».
+
+| Tecla | Acción |
+| --- | --- |
+| Flechas / WASD | Moverse (N/S/E/O) |
+| Shift + flecha/WASD | Abrir la puerta en esa dirección |
+| Espacio | Atacar al enemigo seleccionado |
+| Tab | Cambiar la selección de objetivo |
+| X | Esperar |
+| R | Recoger (primer objeto del suelo) |
+| F | Soltar (primer objeto del inventario) |
+| U | Usar (primer objeto del inventario) |
+| C | Equipar (primer objeto del inventario) |
+| P | Pergamino de retroceso |
+| G / L | Guardar / cargar (ruta por defecto) |
+| I | Abrir el inventario |
+| Esc | Pausa |
+| F1 | Ayuda |
+| F5 | Mostrar u ocultar el minimapa |
+
+La interfaz incluye portada animada, inventario integrado con botones y vistas
+ordenadas, animaciones de combate y trampas, y pantallas de victoria, derrota y
+estadísticas. El panel de efectos muestra veneno, cambios temporales de velocidad
+y antorchas encendidas. Los últimos 20 mensajes se recorren con la rueda sobre su
+panel o con RePág/AvPág. El sonido sigue usando `GestorAudioTemporal`, que es silencioso.
+
+Los recursos están agrupados en `assets/ui/portada/`, `assets/escenarios/<tema>/`,
+`assets/sprites/` y `assets/fuentes/`. La fuente conserva su licencia junto al archivo
+TTF. Los PNG se comprimen sin pérdida, conservando los píxeles y la transparencia.
+
 ## Opciones de ejecución
 
 La ayuda disponible en el programa se consulta con:
@@ -126,6 +195,7 @@ python main.py --help
 | `--silencioso` | Omitir el detalle de acciones durante el replay. |
 | `--reportes ARCHIVO` | Cambiar el archivo del historial de reportes de red. |
 | `--bench` | Ejecutar las mediciones de estructuras y persistencia. |
+| `--gui` | Jugar con la vista Pygame en vez de la consola. No se combina con `--replay`, `--bench` ni `--solo-mapa`. |
 
 `--bench` y `--replay` son modos excluyentes. El benchmark utiliza sus propios datos y tamaños; las opciones de partida, como `--cache-size`, no configuran sus casos. La opción `--hilos` de `main.py` se aplica a partidas nuevas; los ensayos de replay con latencias se ejecutan mediante la herramienta de determinismo.
 
@@ -185,7 +255,7 @@ Si el log no tiene cierre, el programa informa que reprodujo las acciones pero n
 
 [FuenteDeDatos](adaptadores/fuente_datos.py) define las consultas comunes a las fuentes: listado de criptas, datos generales, mapa paginado, contenido de salas, catálogo y versiones.
 
-- **DatosHTTP** consulta el servicio configurado en `adaptadores/datos_http.py`. Identifica al cliente mediante `X-Cripta-Client-Id`, cuenta los intentos y respeta el presupuesto de solicitudes recibido para la cripta. También limita los reintentos ante respuestas 429.
+- **DatosHTTP** consulta el servicio configurado en `adaptadores/datos_http.py`. Identifica al cliente mediante `X-Cripta-Client-Id`, cuenta los intentos y respeta el presupuesto de solicitudes recibido para la cripta. Ante HTTP 429 espera el tiempo indicado y reintenta mientras quede presupuesto. Las esperas pueden cancelarse al cerrar la ventana; no avanzan el reloj virtual. Un límite adicional de reintentos es opcional para usos de diagnóstico.
 - **DatosOffline** responde a las mismas consultas leyendo archivos JSON. La ruta predeterminada es `datos_offline/`.
 - **DatosSimulado** envuelve una fuente y añade demoras reproducibles para las pruebas. No altera el reloj virtual ni el generador aleatorio de la partida.
 
@@ -239,7 +309,7 @@ Cada registro nuevo se agrega al final y se ordena con InsertionSort. Como el re
 
 Al terminar una partida o un replay, se muestra un reporte y se conserva en `partidas/reportes_red.txt`. Incluye solicitudes realizadas, presupuesto, uso de la caché, aciertos y fallos de la LRU y esperas de precarga. Una pila propia conserva los 50 reportes más recientes, con el último al principio.
 
-Actualmente `--bench` imprime sus tablas de rendimiento y termina sin emitir este reporte de red.
+Al terminar, `--bench` también registra un reporte de mediciones locales; no realiza solicitudes HTTP.
 
 ## Arquitectura
 
@@ -248,7 +318,8 @@ La consola recibe los comandos; el controlador los valida y coordina el trabajo 
 ```text
 main.py
 ├── vista/          Entrada por consola y presentación del estado
-├── controlador/    Acciones, carga de datos, replay, guardado y reportes
+├── vista_pygame/   Escenas, renderizado y entrada de la interfaz gráfica
+├── controlador/    Controladores de consola/gráfico, carga, replay, guardado y reportes
 ├── modelo/         Mundo, entidades, reloj, efectos e historial
 ├── estructuras/    Implementaciones propias de los tipos de datos
 ├── adaptadores/    Fuentes HTTP, offline y con latencia simulada
@@ -256,9 +327,17 @@ main.py
 ├── bench/          Casos de medición y calibración del ordenamiento
 ├── herramientas/   Descarga, comparación y ensayos reproducibles
 ├── tests/          Pruebas unitarias, de integración y de regresión
+│   └── vista/      Pruebas de vista_pygame (SDL_VIDEODRIVER/AUDIODRIVER=dummy)
 ├── datos_offline/  Datos incluidos para jugar sin conexión
 └── docs/           Decisiones técnicas, informes y evidencias
 ```
+
+La vista Pygame no toca el modelo directamente: `controlador/controlador_pygame.py`
+corre el mismo `ControladorJuego` de la consola en un hilo de fondo (una "vista"
+suya más, con el mismo protocolo) y publica fotos de solo lectura del estado para que
+la ventana las dibuje. El diseño completo, con sus condiciones de seguridad entre
+hilos, está en [ANALISIS_ARQUITECTURA.md](ANALISIS_ARQUITECTURA.md) y
+[CONTRATOS.md](CONTRATOS.md).
 
 ### Estructuras y dónde se usan
 
@@ -294,6 +373,13 @@ python -m pytest -q
 ```
 
 La suite bloquea las solicitudes HTTP reales y usa datos locales, fuentes simuladas y carpetas temporales. Incluye pruebas de estructuras, validación de datos, persistencia, combate, efectos, inventario, retroceso, comandos, caché, replay y determinismo.
+
+[tests/vista/](tests/vista/) prueba la vista Pygame: el controlador en su hilo de
+fondo, el mapeo de teclas, el render de sala/enemigos, la paridad con la consola
+(misma semilla y acciones → mismo estado final y mismo `.log`) y que `--replay`/
+`--bench` nunca cargan pygame. `tests/vista/conftest.py` fija
+`SDL_VIDEODRIVER=dummy` y `SDL_AUDIODRIVER=dummy` automáticamente: no hace falta
+pantalla ni audio real, ni configurarlo a mano.
 
 Para ejecutar solo las pruebas del cierre del rol 2:
 

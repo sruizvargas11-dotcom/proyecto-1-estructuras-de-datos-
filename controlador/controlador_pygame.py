@@ -1,6 +1,6 @@
 """Puente entre ControladorJuego (sin modificar) y la vista Pygame.
 
-Regla de hilos (aprobada, ver ANALISIS_ARQUITECTURA.md §7):
+Regla de hilos (ver también AppPygame.ejecutar):
   - El modelo (ControladorJuego.jugar(), y por lo tanto Partida/Jugador/Reloj)
     corre entero en UN hilo de fondo, lanzado por iniciar_partida(). Nada fuera
     de ese hilo llama jamás a un método del modelo.
@@ -22,17 +22,28 @@ Regla de hilos (aprobada, ver ANALISIS_ARQUITECTURA.md §7):
 import queue
 import threading
 import traceback
+import uuid
 from dataclasses import dataclass, replace, field
 from pathlib import Path
 
 from controlador.controlador_juego import ControladorJuego
 from controlador.estado_final import lineas_estado
 from controlador.inicio_partida import nueva_partida, ruta_bitacora_por_defecto
-from controlador.reporte_red import construir_reporte, motivo_error, motivo_partida
+from controlador.reporte_red import construir_reporte, motivo_error, motivo_partida, registrar_reporte
 from controlador.semilla import generar_semilla
 from estructuras.array_circular import ArrayCircular
 from persistencia.puntajes import ErrorTablaPuntajes, TablaPuntajes
 from vista_pygame.contratos import FilaPuntaje, ResumenPartida
+
+@dataclass(frozen=True)
+class PartidaGuardadaVisual:
+    ruta: str
+    archivo: str
+    nombre_jugador: str
+    cripta_id: str
+    modificada: float
+    error: str | None = None
+
 
 CAPACIDAD_MENSAJES = 20
 
@@ -49,6 +60,7 @@ class SalidaVisual:
     nombre_destino: str
     cerrada: bool
     tiene_llave: bool
+    llave_tipo_id: str | None = None
 
 
 @dataclass
@@ -70,6 +82,13 @@ class ObjetoVisual:
     clase: str
     equipado: bool
     encendida: bool
+    peso: int = 0
+    valor: int = 0
+    agotada: bool = False
+    ataque_bonus: int = 0
+    defensa_bonus: int = 0
+    duracion: int = 0
+    tiempo_restante: int | None = None
 
 
 @dataclass
@@ -119,13 +138,20 @@ class EstadoPartida:
     salas_visitadas: list
     cargando: bool = False
     proximos_turnos: list = field(default_factory=list)
+    es_sala_salida: bool = False
+    cripta_id: str = ""
+    cripta_nombre: str = ""
 
 
-def _efectos_jugador(jugador):
+def _efectos_jugador(jugador, tiempo=0):
     efectos = []
     veneno = getattr(jugador, "estado_veneno", None)
     if veneno is not None:
         efectos.append(f"envenenado ({veneno.dano_por_pulso}x{veneno.pulsos_restantes})")
+    velocidad = getattr(jugador, "evento_mod_velocidad", None)
+    if velocidad is not None and velocidad.valido and velocidad._en_heap:
+        restante = max(0, velocidad.tiempo-tiempo)
+        efectos.append(f"velocidad temporal: {jugador.velocidad} ({restante} ut)")
     for nodo in jugador.inventario.recorrer_desde_frente():
         objeto = nodo.valor
         if objeto.clase == "antorcha" and objeto.encendida:
@@ -149,6 +175,7 @@ def construir_estado(partida, proximos_turnos=None, cargando=False):
             nombre_destino=destino.nombre if destino is not None else "",
             cerrada=salida.cerrada,
             tiene_llave=partida.llave_para(salida) is not None if salida.cerrada else False,
+            llave_tipo_id=salida.llave,
         ))
 
     def actor_visual(actor, comportamiento=""):
@@ -164,18 +191,27 @@ def construir_estado(partida, proximos_turnos=None, cargando=False):
     enemigos_activos = [actor_visual(e, e.comportamiento) for e in sala.enemigos_activos]
     enemigos_dormidos = [actor_visual(e, e.comportamiento) for e in sala.enemigos_dormidos]
 
-    objetos_suelo = [ObjetoVisual(o.instancia_id, o.tipo_id, o.nombre, o.clase, False,
-                                  getattr(o, "encendida", False)) for o in sala.objetos_suelo]
+    def objeto_visual(o, equipado=False):
+        duracion=getattr(o,'duracion',0) if o.clase=='antorcha' else 0
+        restante=None
+        agotada=False
+        if o.clase=='antorcha':
+            evento=o.evento_apagado
+            pendiente=evento is not None and evento.valido and evento._en_heap
+            agotada=getattr(o,'usos_restantes',1)<=0 and not pendiente
+            restante=(max(0,min(duracion,evento.tiempo-partida.tiempo)) if pendiente else
+                      duracion if getattr(o,'usos_restantes',1)>0 else 0)
+        return ObjetoVisual(o.instancia_id,o.tipo_id,o.nombre,o.clase,equipado,
+                            getattr(o,'encendida',False),peso=o.peso,valor=o.valor,agotada=agotada,
+                            ataque_bonus=getattr(o,'ataque_bonus',0),
+                            defensa_bonus=getattr(o,'defensa_bonus',0),
+                            duracion=duracion,tiempo_restante=restante)
 
+    objetos_suelo=[objeto_visual(o) for o in sala.objetos_suelo]
     trampas = [TrampaVisual(t.nombre, t.armada) for t in sala.trampas]
-
-    inventario = []
-    for nodo in jugador.inventario.recorrer_desde_frente():
-        o = nodo.valor
-        inventario.append(ObjetoVisual(
-            o.instancia_id, o.tipo_id, o.nombre, o.clase,
-            equipado=(o is jugador.arma_equipada or o is jugador.armadura_equipada),
-            encendida=getattr(o, "encendida", False)))
+    inventario=[objeto_visual(nodo.valor,nodo.valor is jugador.arma_equipada
+                             or nodo.valor is jugador.armadura_equipada)
+                for nodo in jugador.inventario.recorrer_desde_frente()]
 
     salas_visitadas = [s.id for s in partida.cripta.recorrer_salas() if s.tiempo_rastro >= 0]
 
@@ -200,11 +236,13 @@ def construir_estado(partida, proximos_turnos=None, cargando=False):
         ataque=jugador.ataque, defensa=jugador.defensa, velocidad=jugador.velocidad,
         arma_equipada=jugador.arma_equipada.nombre if jugador.arma_equipada else "",
         armadura_equipada=jugador.armadura_equipada.nombre if jugador.armadura_equipada else "",
-        inventario=inventario, efectos=_efectos_jugador(jugador),
+        inventario=inventario, efectos=_efectos_jugador(jugador, partida.tiempo),
         enemigos_derrotados=partida.enemigos_derrotados,
         acciones_jugador=partida.acciones_jugador,
         estado=partida.estado, salas_visitadas=salas_visitadas,
         cargando=cargando, proximos_turnos=proximos,
+        es_sala_salida=sala.id==partida.cripta.sala_salida_id,
+        cripta_id=partida.cripta_id,
     )
 
 
@@ -235,17 +273,34 @@ class EventoAtaque:
     atacante_id: str = ""
     objetivo_id: str = ""
     dano: int = 0
+    vida_antes: int | None = None
+    vida_despues: int | None = None
+    tiempo: int | None = None
+
+
+@dataclass
+class EventoTrampa:
+    tipo: str = 'trampa'
+    objetivo_id: str = ''
+    dano: int = 0
+    vida_antes: int | None = None
+    vida_despues: int | None = None
+    tiempo: int | None = None
+    nombre: str = ''
+    tipos: tuple = ()
 
 
 class ControladorPygame:
     """Vista no interactiva para ControladorJuego + API de alto nivel para
     las escenas de menú, pausa, inventario y fin de partida."""
 
-    def __init__(self, fuente, carpeta_cache=None, cache_size=25, partidas_dir="partidas"):
+    def __init__(self, fuente, carpeta_cache=None, cache_size=25, partidas_dir="partidas", reportes=None):
         self._fuente = fuente
+        self._fuente_usada = False
         self._carpeta_cache = carpeta_cache
         self._cache_size = cache_size
         self._partidas_dir = partidas_dir
+        self._ruta_reportes = reportes
 
         self._lock = threading.Lock()
         self._comandos = queue.Queue()
@@ -266,34 +321,144 @@ class ControladorPygame:
         self._hilo = None
         self._controlador = None
         self.sesion = None
+        self._revision_sesion = 0
         self.nombre_jugador = None
         self._topologia = None
         self._sala_inicial_id = None
         self._sala_salida_id = None
+        self._criptas_disponibles = ()
 
     # -- arranque / cierre (API para las escenas, hilo principal) --------
 
-    def listar_criptas(self):
-        respuesta = self._fuente.listar_criptas()
-        return list(respuesta["criptas"])
+    def _preparar_fuente_nueva_partida(self):
+        fabrica=getattr(self._fuente,'para_nueva_partida',None)
+        if self._fuente_usada and self._hilo is None and callable(fabrica):
+            self._fuente=fabrica()
+            self._fuente_usada=False
 
-    def iniciar_partida(self, id_cripta, nombre_jugador, semilla=None):
+    def listar_criptas(self):
+        self._preparar_fuente_nueva_partida()
+        respuesta = self._fuente.listar_criptas()
+        if not isinstance(respuesta, dict) or not isinstance(respuesta.get('criptas'), list):
+            raise ValueError('GET /criptas: respuesta inválida; se esperaba una lista de criptas.')
+        for indice, cripta in enumerate(respuesta['criptas'], 1):
+            if (not isinstance(cripta, dict)
+                    or any(not isinstance(cripta.get(campo), str) or not cripta[campo].strip()
+                           for campo in ('id', 'nombre'))
+                    or type(cripta.get('salas')) is not int or cripta['salas'] < 1
+                    or type(cripta.get('dificultad')) is not int or cripta['dificultad'] < 0):
+                raise ValueError(f'GET /criptas: cripta #{indice} con campos inválidos o ausentes.')
+        criptas=list(respuesta['criptas'])
+        with self._lock:self._criptas_disponibles=tuple(criptas)
+        return criptas
+
+    def nombre_cripta(self,id_cripta):
+        with self._lock:
+            return next((c['nombre'] for c in self._criptas_disponibles if c['id']==id_cripta),id_cripta)
+
+    def listar_partidas_guardadas(self):
+        """Lee metadatos en el hilo del menú; nunca reconstruye el modelo."""
+        from persistencia.PartidaBinaria import PartidaBinaria, ErrorFormatoBinario
+        from controlador.guardado import ESQUEMA_ESTADO
+        from estructuras.vector_dinamico import Vector
+        from estructuras.ordenamientos import ordenar
+        filas=Vector()
+        for ruta in Path(self._partidas_dir).glob('*.sav'):
+            try:
+                modificada=ruta.stat().st_mtime
+                datos=PartidaBinaria(str(ruta)).cargar_global()
+                if datos.get('esquema_estado')!=ESQUEMA_ESTADO:
+                    raise ValueError('Versión de guardado incompatible.')
+                nombre=datos.get('nombre_jugador')
+                cripta=datos.get('cripta_id')
+                if not isinstance(nombre,str) or not nombre.strip() or not isinstance(cripta,str) or not cripta:
+                    raise ValueError('Faltan datos del jugador o de la cripta.')
+                filas.agregarValor(PartidaGuardadaVisual(str(ruta.resolve()),ruta.name,nombre,cripta,modificada))
+            except (OSError,ValueError,TypeError,AttributeError,ErrorFormatoBinario) as error:
+                filas.agregarValor(PartidaGuardadaVisual(str(ruta.resolve()),ruta.name,'','',0,
+                                                         f'No disponible: {error}'))
+        def comparar(a,b):
+            ka,kb=(-a.modificada,a.archivo),(-b.modificada,b.archivo)
+            return (ka>kb)-(ka<kb)
+        ordenar(filas,comparar)
+        return list(filas)
+
+    def cargar_partida_guardada(self,ruta):
+        """Arranque desde disco, antes de iniciar el único hilo del modelo."""
+        from persistencia.PartidaBinaria import PartidaBinaria, ErrorFormatoBinario
+        from controlador.guardado import ESQUEMA_ESTADO
+        try:
+            datos=PartidaBinaria(str(ruta)).cargar_global()
+        except (OSError,ValueError,ErrorFormatoBinario) as error:
+            raise ValueError(f'No se pudo leer el guardado: {error}') from error
+        if not isinstance(datos,dict) or datos.get('esquema_estado')!=ESQUEMA_ESTADO:
+            raise ValueError('Versión de guardado incompatible.')
+        if not isinstance(datos.get('cripta_id'),str):raise ValueError('Falta la cripta del guardado.')
+        from controlador.semilla import validar_semilla
+        semilla=validar_semilla(datos.get('semilla'))
+        self.iniciar_partida(datos['cripta_id'],datos.get('nombre_jugador'),semilla,
+                            ruta_carga=str(ruta))
+
+    def iniciar_partida(self, id_cripta, nombre_jugador, semilla=None, *, ruta_carga=None):
+        if not isinstance(nombre_jugador,str) or not nombre_jugador.strip():
+            raise ValueError('El nombre del jugador es obligatorio.')
+        nombre_jugador=nombre_jugador.strip()
         if self._hilo is not None:
             raise RuntimeError("Ya hay una partida en curso en este controlador.")
+        self._preparar_fuente_nueva_partida()
+        self._fuente_usada=True
+        # La sesión anterior ya terminó: no reutilizar Q pendientes,
+        # fotos de derrota, mensajes ni resumen al volver desde la portada.
+        self._comandos = queue.Queue()
+        with self._lock:
+            self._estado = None
+            self._resumen_fin = None
+            self._error = None
+            self._esperando = False
+            self._eventos_pendientes = []
+            self._historial_mensajes = ArrayCircular(CAPACIDAD_MENSAJES)
+            self._panel_inventario = None
+            self._panel_objeto = None
+            self._reporte_red = []
+            self._filas_puntajes = None
         self.nombre_jugador = nombre_jugador
         semilla_real = semilla if semilla is not None else generar_semilla()
         ruta_log = ruta_bitacora_por_defecto(
             id_cripta, semilla_real, str(Path(self._partidas_dir) / "bitacoras"))
+        if ruta_carga is not None:
+            ruta_log=str(Path(ruta_log).with_name('carga_'+uuid.uuid4().hex+'.log'))
         self.sesion = nueva_partida(
             self._fuente, id_cripta, self._carpeta_cache, semilla=semilla_real,
             ruta_bitacora=ruta_log, cache_size=self._cache_size,
             nombre_jugador=nombre_jugador)
+        if ruta_carga is not None:
+            from controlador.guardado import cargar
+            base=self.sesion
+            try:
+                restaurada=cargar(ruta_carga,base)
+                restaurada.bitacora=base.bitacora
+                for tiempo,accion in restaurada.acciones:
+                    restaurada.bitacora.registrar(tiempo,accion)
+            except Exception:
+                if base.bitacora is not None:base.bitacora.cerrar()
+                base.red.cerrar(5)
+                self.sesion=None
+                raise
+            base.red.cerrar(5)
+            self.sesion=restaurada
+            self.nombre_jugador=restaurada.nombre_jugador
+            self.restaurar_mensajes(restaurada.mensajes_guardados or [])
+            self.agregar_mensaje(restaurada.partida.tiempo,f'Partida cargada: {Path(ruta_carga).name}')
         self.sesion.partida.al_mover_enemigo.agregarValor(self._on_mover_enemigo)
         self.sesion.partida.al_atacar.agregarValor(self._on_atacar)
+        self.sesion.partida.al_activar_trampa.agregarValor(self._on_trampa)
         self._leer_topologia()
+        ruta_guardado=(ruta_carga if ruta_carga is not None else
+                       str(Path(self._partidas_dir)/('partida_'+uuid.uuid4().hex[:12]+'.sav')))
         self._controlador = ControladorJuego(
-            self.sesion, self, str(Path(self._partidas_dir) / "partida.sav"),
-            tabla_puntajes=self._tabla)
+            self.sesion, self, ruta_guardado, tabla_puntajes=self._tabla)
+        if ruta_carga is not None and self.sesion.protegidas is not None:
+            self._controlador._protegidas=self.sesion.protegidas
         self._hilo = threading.Thread(target=self._correr, name="cripta-modelo", daemon=False)
         self._hilo.start()
 
@@ -321,16 +486,36 @@ class ControladorPygame:
         return self._sala_salida_id
 
     def _correr(self):
+        error_partida = None
         try:
             self._controlador.jugar()
-        except Exception:
+        except Exception as error:
+            error_partida = error
             with self._lock:
                 self._error = traceback.format_exc()
+                self._esperando = False
+        finally:
+            # Una vez por partida, en el mismo hilo que cerró la red y la bitácora.
+            # También cubre victoria/derrota antes de salir de la ventana.
+            sesion = self._controlador.sesion
+            motivo = motivo_error(error_partida) if error_partida is not None else motivo_partida(sesion.partida.estado)
+            texto = registrar_reporte(self._fuente, sesion, 'partida', motivo,
+                                     ruta=self._ruta_reportes,
+                                     bitacora=getattr(sesion.bitacora, 'ruta', None))
+            with self._lock:
+                self._reporte_red = texto.splitlines()
+
+    def cancelar_red(self):
+        """El cierre de la vista cancela esperas HTTP sin tocar el reloj virtual."""
+        cancelar = getattr(self._fuente, 'cancelar_pendientes', None)
+        if callable(cancelar):
+            cancelar()
 
     def salir(self):
         """Cierre ordenado: pide salir y espera a que el hilo termine de
         verdad (cierra bitácora y red) antes de volver. Nunca lo abandona a
         medias confiando en que sea un hilo daemon."""
+        self.cancelar_red()
         if self._hilo is None:
             return
         self._comandos.put("Q")
@@ -342,13 +527,13 @@ class ControladorPygame:
     # -- guardar / cargar / pergamino: por la cola, como cualquier acción --
 
     def guardar(self, ruta=None):
-        self._comandos.put(f"G {ruta}" if ruta else "G")
+        self.enviar_comando(f"G {ruta}" if ruta else "G")
 
     def cargar(self, ruta=None):
-        self._comandos.put(f"L {ruta}" if ruta else "L")
+        self.enviar_comando(f"L {ruta}" if ruta else "L")
 
     def pergamino(self):
-        self._comandos.put("P")
+        self.enviar_comando("P")
 
     def enviar_comando(self, texto):
         """Para la escena de partida: cualquier otro comando de juego."""
@@ -360,6 +545,11 @@ class ControladorPygame:
     def estado(self):
         with self._lock:
             return self._estado
+
+    def revision_sesion(self):
+        """Permite descartar referencias visuales tras una carga, incluso en la misma sala."""
+        with self._lock:
+            return self._revision_sesion
 
     def esperando_red(self):
         """True entre el envío de un comando y la próxima foto publicada:
@@ -387,7 +577,8 @@ class ControladorPygame:
             return self._error
 
     def resumen_fin(self):
-        return self._resumen_fin
+        with self._lock:
+            return self._resumen_fin
 
     def tabla_puntajes(self):
         """Lista de FilaPuntaje, de la mejor a la peor.
@@ -439,9 +630,11 @@ class ControladorPygame:
             self.nombre_jugador = actual.nombre_jugador
             actual.partida.al_mover_enemigo.agregarValor(self._on_mover_enemigo)
             actual.partida.al_atacar.agregarValor(self._on_atacar)
+            actual.partida.al_activar_trampa.agregarValor(self._on_trampa)
             self._leer_topologia()
             with self._lock:
                 self._eventos_pendientes.clear()
+                self._revision_sesion += 1
         lineas = construir_reporte(self._fuente, actual, 'partida',
                                    motivo_partida(actual.partida.estado))
         with self._lock:
@@ -454,6 +647,7 @@ class ControladorPygame:
         self._sincronizar_sesion()
         proximos = partida.reloj.proximos_eventos(5)
         foto = construir_estado(partida, proximos_turnos=proximos)
+        foto = replace(foto,cripta_nombre=self.nombre_cripta(partida.cripta_id))
         with self._lock:
             self._estado = foto
             self._esperando = False
@@ -497,7 +691,7 @@ class ControladorPygame:
                 self._filas_puntajes = filas
         red = self.sesion.red
         cache = dict(red.estadisticas_cache())
-        self._resumen_fin = ResumenPartida(
+        resumen = ResumenPartida(
             resultado=partida.estado,
             nombre_jugador=self._controlador.sesion.nombre_jugador,
             id_cripta=partida.cripta_id,
@@ -510,6 +704,14 @@ class ControladorPygame:
             aciertos_cache=cache.get("aciertos", 0),
             fallos_cache=cache.get("fallos", 0),
         )
+
+        # El último golpe puede terminar la partida entre dos turnos del
+        # jugador. Publicar también esa foto; no habrá otro mostrar_estado.
+        foto = construir_estado(partida, proximos_turnos=[])
+        with self._lock:
+            self._estado = foto
+            self._esperando = False
+            self._resumen_fin = resumen
 
     def leer_comando(self):
         """Bloquea el HILO DE FONDO (no el de pygame) hasta que una escena
@@ -528,4 +730,13 @@ class ControladorPygame:
         with self._lock:
             self._eventos_pendientes.append(EventoAtaque(
                 atacante_id=atacante.instancia_id, objetivo_id=objetivo.instancia_id,
-                dano=dano))
+                dano=dano,vida_antes=objetivo.vida+dano,vida_despues=objetivo.vida,
+                tiempo=self.sesion.partida.tiempo))
+
+    def _on_trampa(self,actor,dano,nombres):
+        with self._lock:
+            self._eventos_pendientes.append(EventoTrampa(
+                objetivo_id=actor.instancia_id,dano=dano,vida_antes=actor.vida+dano,
+                vida_despues=actor.vida,tiempo=self.sesion.partida.tiempo,nombre=nombres,
+                tipos=tuple(t.tipo_id for t in actor.sala_actual.trampas
+                            if not t.armada and t.nombre in nombres)))

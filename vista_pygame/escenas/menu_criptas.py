@@ -1,29 +1,8 @@
-"""Escena de portada: selección de cripta.
+"""Selección de cripta con nombre obligatorio y portada animada adaptable.
 
-Fondo con el boceto `assets/ui/portada.png` (si no existe, color sólido de
-la paleta: nunca rompe), visible completo, sin ningún panel ni viñeta
-encima. El boceto puede traer título y filas de ejemplo ya dibujados; esta
-escena no los lee como datos. Sin una versión limpia del fondo
-(`assets/ui/portada_limpia.png`), el título, el subtítulo y hasta 4 criptas
-se dibujan EXACTAMENTE sobre los rectángulos medidos una vez con
-`herramientas/medir_portada.py` (proporciones en `config_vista.py`), con un
-ancho uniforme entre las filas para que ninguna placa pintada asome — y si
-hay menos de 4 criptas, las filas sobrantes se tapan con una placa vacía
-idéntica. Con portada_limpia.png (sin texto pintado), cada placa se ajusta
-al ancho de su propio texto.
-
-`listar_criptas()` puede bloquear (red); se consulta en un hilo propio de la
-escena (no el hilo de modelo de ControladorPygame, que todavía no existe acá:
-la partida no ha empezado) para no congelar la ventana. Esta escena es dueña
-de iniciar la partida: llama a `controlador.iniciar_partida(...)` ella misma
-al confirmar una cripta y le pasa `datos=None` a la escena de partida (que ya
-no vuelve a iniciarla — ver el ajuste en `escenas/partida.py`).
-
-Sin dict como índice/caché (regla del curso): las criptas llegan como lista
-de registros planos (la propia respuesta de la fuente de datos, no una
-estructura nuestra), el caché de fuentes es una lista de pares recorrida
-linealmente (mismo patrón que `stubs_temporales.CargadorAssetsTemporal`), y
-el foco es un entero simple (-1 = nombre, 0..N-1 = cripta).
+La portada original se conserva como recurso de referencia. La versión limpia
+permite mover personajes y ambiente como capas, y el arte original es el fallback.
+Las criptas se consultan en un hilo; los eventos y el dibujo pertenecen a Pygame.
 """
 import math
 import os
@@ -31,6 +10,7 @@ import threading
 from dataclasses import dataclass
 
 import pygame
+from vista_pygame.recursos.fuente_cripta import fuente_pixel_legible
 
 from vista_pygame.config_vista import (
     ALTO_LOGICO, ANCHO_LOGICO, COLOR_AVISO, COLOR_FONDO, COLOR_PELIGRO,
@@ -39,9 +19,11 @@ from vista_pygame.config_vista import (
     PORTADA_TITULO_PROP,
 )
 from vista_pygame.contratos import EscenaBase
+from vista_pygame.render.portada_animada import PortadaAnimada
+from vista_pygame.render.panel_mazmorra import PanelMazmorra
 
-RUTA_FONDO = "assets/ui/portada.png"
-RUTA_FONDO_LIMPIO = "assets/ui/portada_limpia.png"
+RUTA_FONDO = "assets/ui/portada/portada.png"
+RUTA_FONDO_LIMPIO = "assets/ui/portada/portada_limpia.png"
 CANDIDATOS_FUENTE_PIXEL = (
     "assets/fuentes/PressStart2P-Regular.ttf",
     "assets/fuentes/PressStart2P.ttf",
@@ -50,7 +32,7 @@ CANDIDATOS_FUENTE_PIXEL = (
     "assets/fuentes/PixelifySans.ttf",
 )
 MAX_NOMBRE = 20
-NOMBRE_POR_DEFECTO = "Jugador"
+NOMBRE_POR_DEFECTO = ""
 
 TITULO_TEXTO = "CRIPTA - Seleccionar Mazmorra"
 TITULO_TAMANO_INICIAL = 26
@@ -58,27 +40,26 @@ TITULO_TAMANO_MINIMO = 12
 MARGEN_TITULO_INTERNO = 24
 MARGEN_FILA_UNIFORME = 4   # +4 px sobre la placa pintada más ancha (sin portada_limpia)
 PADDING_TEXTO_LIMPIO = 16   # relleno a cada lado del texto (con portada_limpia)
-FILA_TAMANO_INICIAL = 18
+FILA_TAMANO_INICIAL = 20
 FILA_TAMANO_MINIMO = 12
 FILA_MARGEN_INTERNO = 16
 
 FLECHA_PERIODO_MS = 800
 FLECHA_AMPLITUD = 2.5
 
-# -- Paleta de las placas, igual al boceto: madera oscura casi lisa, marco
-# metálico fino, selección dorada (nunca cambia el fondo de la placa). --
+# -- Paleta de texto y detalles rúnicos sobre basalto e hierro oscuro. --
 COLOR_MADERA_BASE = (0x2e, 0x22, 0x19)
 COLOR_VETA = (0x36, 0x28, 0x1d)
 COLOR_MARCO = (0x4a, 0x4f, 0x55)
 COLOR_MARCO_INTERIOR = (0x6e, 0x73, 0x78)
-COLOR_TEXTO_PLACA = (0xd9, 0xcd, 0xb0)
-COLOR_TEXTO_TITULO = (0xe8, 0xdc, 0xc0)
-COLOR_SUBTITULO_TEXTO = (0x9a, 0x94, 0x88)
+COLOR_TEXTO_PLACA = (0xf2, 0xe9, 0xd3)
+COLOR_TEXTO_TITULO = (0xff, 0xee, 0xc2)
+COLOR_SUBTITULO_TEXTO = (0xd0, 0xca, 0xbc)
 COLOR_SELECCION_BORDE = (0xe0, 0xb2, 0x4a)
 COLOR_SELECCION_TEXTO = (0xf5, 0xd7, 0x7a)
 COLOR_FLECHA = (0xe0, 0xb2, 0x4a)
 COLOR_FLECHA_BORDE = (0x14, 0x18, 0x1f)
-COLOR_PLACEHOLDER_NOMBRE = (120, 114, 100)
+COLOR_PLACEHOLDER_NOMBRE = (174, 180, 188)
 COLOR_SOMBRA_PLACA = (10, 8, 6)
 
 
@@ -108,13 +89,20 @@ class EscenaMenuCriptas(EscenaBase):
         self._tamano_layout = (ANCHO_LOGICO, ALTO_LOGICO)
         self._layout = self._calcular_layout(*self._tamano_layout)
 
+        self._paneles = PanelMazmorra()
+        self._portada_animada = PortadaAnimada()
         self._fondo, self._fondo_limpio = self._cargar_fondo_preferido()
+        if self._portada_animada.disponible:
+            self._fondo_limpio = True
+        self._tamano_objetivo = self._tamano_layout
+        self._error_nombre = None
 
+        self._escala_texto = 1
         self._ruta_fuente_pixel = self._buscar_fuente_pixel()
         self._fuentes_cache = []   # [(tamano, Font), ...] — sin dict (regla del curso)
-        self._fuente_normal = self._fuente(20)
-        self._fuente_fila = self._fuente(18)
-        self._fuente_chica = self._fuente(15)
+        self._fuente_normal = self._fuente(24)
+        self._fuente_fila = self._fuente(20)
+        self._fuente_chica = self._fuente(18)
 
         # El título no cambia en la vida de la escena: se renderiza una sola
         # vez. Sin portada_limpia, su placa es de ancho fijo (medido) y el
@@ -122,7 +110,7 @@ class EscenaMenuCriptas(EscenaBase):
         # ajusta a un tamaño de letra fijo (ver _rect_titulo_actual).
         if self._fondo_limpio:
             self._titulo_superficie = self._fuente(TITULO_TAMANO_INICIAL).render(
-                TITULO_TEXTO, True, COLOR_TEXTO_TITULO)
+                TITULO_TEXTO, False, COLOR_TEXTO_TITULO)
         else:
             ancho_max = self._layout.titulo_rect.w - 2 * MARGEN_TITULO_INTERNO
             self._titulo_superficie = self._renderizar_ajustado(
@@ -177,7 +165,7 @@ class EscenaMenuCriptas(EscenaBase):
         viewport_bottom = fila_rects[3].bottom
 
         gap = max(8, round(0.018 * PORTADA_REF_ALTO * escala))
-        nombre_ancho = round(ancho_uniforme * 0.62)
+        nombre_ancho = min(ancho_ventana-48, max(360,round(ancho_uniforme * 0.90)))
         nombre_rect = pygame.Rect(centro_x - nombre_ancho // 2, viewport_bottom + gap,
                                   nombre_ancho, fila_rects[0].h)
 
@@ -195,11 +183,22 @@ class EscenaMenuCriptas(EscenaBase):
         la última vez — nunca por frame. Hoy la ventana no se redimensiona
         (ANCHO_LOGICO/ALTO_LOGICO son constantes), así que en la práctica
         esto se queda en una comparación barata de dos enteros."""
-        tamano_actual = (ANCHO_LOGICO, ALTO_LOGICO)
+        tamano_actual = getattr(self,'_tamano_objetivo',(ANCHO_LOGICO,ALTO_LOGICO))
         if tamano_actual == self._tamano_layout:
             return
         self._tamano_layout = tamano_actual
         self._layout = self._calcular_layout(*tamano_actual)
+        self._escala_texto = min(tamano_actual[0]/ANCHO_LOGICO,tamano_actual[1]/ALTO_LOGICO)
+        self._fuente_normal=self._fuente(24)
+        self._fuente_fila=self._fuente(20)
+        self._fuente_chica=self._fuente(18)
+        self._titulo_superficie=self._renderizar_ajustado(TITULO_TEXTO,
+            self._layout.titulo_rect.w-2*MARGEN_TITULO_INTERNO,TITULO_TAMANO_INICIAL,
+            COLOR_TEXTO_TITULO,TITULO_TAMANO_MINIMO)
+
+    def establecer_tamano(self, tamano):
+        self._tamano_objetivo = tamano
+        self._refrescar_layout_si_hace_falta()
 
     def _rect_fila_sin_scroll(self, indice):
         layout = self._layout
@@ -258,8 +257,8 @@ class EscenaMenuCriptas(EscenaBase):
     # -- fondo y fuentes ---------------------------------------------------
 
     def _cargar_fondo_preferido(self):
-        """assets/ui/portada_limpia.png (sin texto) si existe; si no,
-        assets/ui/portada.png; si ninguno carga, None (color sólido,
+        """assets/ui/portada/portada_limpia.png (sin texto) si existe; si no,
+        assets/ui/portada/portada.png; si ninguno carga, None (color sólido,
         nunca rompe). El booleano dice si el fondo ya viene "limpio" (sin
         texto del boceto), para no dibujar ninguna placa de cobertura."""
         disp_tamano = (round(PORTADA_REF_ANCHO * self._layout.escala),
@@ -288,27 +287,23 @@ class EscenaMenuCriptas(EscenaBase):
         return None
 
     def _fuente(self, tamano):
+        tamano=max(10,round(tamano*self._escala_texto))
         for t, fuente in self._fuentes_cache:
             if t == tamano:
                 return fuente
-        if self._ruta_fuente_pixel is not None:
-            try:
-                fuente = pygame.font.Font(self._ruta_fuente_pixel, tamano)
-            except pygame.error:
-                fuente = self.contexto.assets.fuente(tamano)
-        else:
-            fuente = self.contexto.assets.fuente(tamano)
+        # Trazo pixelado regular: sin negrita, relieve ni suavizado.
+        fuente = fuente_pixel_legible(tamano)
         self._fuentes_cache.append((tamano, fuente))
         return fuente
 
     def _renderizar_ajustado(self, texto, ancho_max, tamano_inicial, color, tamano_min):
         tamano = tamano_inicial
         while tamano > tamano_min:
-            superficie = self._fuente(tamano).render(texto, True, color)
+            superficie = self._fuente(tamano).render(texto, False, color)
             if superficie.get_width() <= ancho_max:
                 return superficie
             tamano -= 2
-        return self._fuente(tamano_min).render(texto, True, color)
+        return self._fuente(tamano_min).render(texto, False, color)
 
     @staticmethod
     def _texto_fila(cripta):
@@ -320,11 +315,11 @@ class EscenaMenuCriptas(EscenaBase):
         no debe asomar fuera del marco."""
         tamano = FILA_TAMANO_INICIAL
         while tamano > FILA_TAMANO_MINIMO:
-            superficie = self._fuente(tamano).render(texto, True, color)
+            superficie = self._fuente(tamano).render(texto, False, color)
             if superficie.get_width() <= ancho_max:
                 return superficie
             tamano -= 2
-        return self._fuente(FILA_TAMANO_MINIMO).render(texto, True, color)
+        return self._fuente(FILA_TAMANO_MINIMO).render(texto, False, color)
 
     # -- ciclo de vida ---------------------------------------------------
 
@@ -335,6 +330,7 @@ class EscenaMenuCriptas(EscenaBase):
         self._scroll = 0
         self._iniciando = False
         self._tiempo_acumulado = 0
+        self._error_nombre = None
         with self._lock:
             self._criptas = []
         self.contexto.audio.reproducir_musica("menu")
@@ -394,6 +390,9 @@ class EscenaMenuCriptas(EscenaBase):
 
         lista_lista = not cargando and error is None
 
+        if self._foco == -1 and evento.key == pygame.K_a and evento.mod & pygame.KMOD_CTRL:
+            self._nombre_seleccionado = True
+            return
         if evento.key == pygame.K_TAB and lista_lista:
             direccion = -1 if evento.mod & pygame.KMOD_SHIFT else 1
             self._mover_foco(direccion, cantidad)
@@ -405,18 +404,21 @@ class EscenaMenuCriptas(EscenaBase):
             self.contexto.audio.reproducir_sfx("menu_mover")
         elif evento.key == pygame.K_RETURN:
             if self._foco == -1:
+                if not self._validar_nombre():
+                    return
                 if lista_lista and cantidad:
                     self._foco = 0
                     self._asegurar_visible(cantidad)
                     self.contexto.audio.reproducir_sfx("menu_mover")
             else:
                 self._confirmar(cantidad)
-        elif evento.key == pygame.K_BACKSPACE and self._foco == -1:
+        elif evento.key in (pygame.K_BACKSPACE,pygame.K_DELETE) and self._foco == -1:
             if self._nombre_seleccionado:
                 self._nombre = ""
             else:
                 self._nombre = self._nombre[:-1]
             self._nombre_seleccionado = False
+            self._error_nombre = None
         elif self._foco == -1:
             self._editar_nombre(evento)
 
@@ -424,6 +426,7 @@ class EscenaMenuCriptas(EscenaBase):
         caracter = evento.unicode
         if not (caracter and caracter.isprintable()):
             return
+        self._error_nombre = None
         if self._nombre_seleccionado:
             # El valor por defecto estaba "seleccionado": la primera tecla
             # lo reemplaza entero, no se agrega al final.
@@ -466,8 +469,10 @@ class EscenaMenuCriptas(EscenaBase):
             if self._foco >= len(self._criptas):
                 return
             cripta = self._criptas[self._foco]
+        if not self._validar_nombre():
+            return
         self._iniciando = True
-        # Garantía explícita (§5.1/ANALISIS_ARQUITECTURA.md): el hilo que
+        # Garantía de acceso secuencial a la fuente: el hilo que
         # consultó listar_criptas() debe haber terminado del todo antes de
         # que iniciar_partida() empiece a usar la misma fuente de datos
         # (nueva_partida la llama de forma síncrona, en este mismo hilo) —
@@ -477,10 +482,21 @@ class EscenaMenuCriptas(EscenaBase):
         # seguridad barata, no una espera real.
         if self._hilo_carga is not None:
             self._hilo_carga.join()
-        nombre = self._nombre.strip() or NOMBRE_POR_DEFECTO
+        nombre = self._nombre.strip()
         self.contexto.audio.reproducir_sfx("menu_confirmar")
-        self.contexto.controlador.iniciar_partida(cripta["id"], nombre, semilla=None)
-        self.contexto.cambiar_escena(ESCENA_PARTIDA, None)
+        if callable(getattr(self.contexto,'iniciar_cripta',None)):
+            self.contexto.iniciar_cripta((cripta['id'],nombre,None))
+        else:
+            self.contexto.controlador.iniciar_partida(cripta['id'],nombre,semilla=None)
+            self.contexto.cambiar_escena(ESCENA_PARTIDA,None)
+
+    def _validar_nombre(self):
+        if not self._nombre.strip():
+            self._error_nombre = 'Escribí un nombre para jugar.'
+            self._foco = -1
+            return False
+        self._error_nombre = None
+        return True
 
     def _elemento_en_posicion(self, pos):
         """-1 si 'pos' cae en el campo de nombre, el índice de la cripta si
@@ -529,15 +545,18 @@ class EscenaMenuCriptas(EscenaBase):
     # -- actualización -----------------------------------------------
 
     def actualizar(self, dt_ms):
-        self._tiempo_acumulado += dt_ms
+        self._tiempo_acumulado += max(0,dt_ms)
+        self._portada_animada.actualizar(dt_ms)
         self._refrescar_layout_si_hace_falta()
 
     # -- dibujo --------------------------------------------------------
 
     def dibujar(self, pantalla):
-        self._refrescar_layout_si_hace_falta()   # red de seguridad si no hubo actualizar() antes
+        self.establecer_tamano(pantalla.get_size())
         pantalla.fill(COLOR_FONDO)
-        if self._fondo is not None:
+        if self._portada_animada.disponible:
+            self._portada_animada.dibujar(pantalla)
+        elif self._fondo is not None:
             pantalla.blit(self._fondo, (self._layout.offset_x, self._layout.offset_y))
 
         with self._lock:
@@ -564,7 +583,7 @@ class EscenaMenuCriptas(EscenaBase):
         if rect_actual is not None:
             self._dibujar_flechas(pantalla, rect_actual)
 
-    # -- placas al estilo del boceto: madera casi lisa + marco fino -------
+    # -- paneles de basalto oscuro y hierro remachado --------------------
 
     @staticmethod
     def _puntos_biselados(rect, corte):
@@ -578,27 +597,7 @@ class EscenaMenuCriptas(EscenaBase):
         ]
 
     def _dibujar_placa(self, pantalla, rect, seleccionada=False):
-        if seleccionada:
-            self._dibujar_brillo_dorado(pantalla, rect)
-
-        pantalla.fill(COLOR_SOMBRA_PLACA, rect.move(3, 3))   # sombra abajo a la derecha
-
-        corte = min(3, rect.w // 4, rect.h // 4)
-        puntos = self._puntos_biselados(rect, corte)
-        pygame.draw.polygon(pantalla, COLOR_MADERA_BASE, puntos)
-
-        y = rect.y + 4   # vetas muy sutiles, no un rayado denso
-        while y < rect.bottom - 3:
-            pygame.draw.line(pantalla, COLOR_VETA, (rect.x + 3, y), (rect.right - 4, y))
-            y += 7
-
-        interior = rect.inflate(-4, -4)
-        if interior.w > 0 and interior.h > 0:
-            puntos_interior = self._puntos_biselados(interior, max(0, corte - 1))
-            pygame.draw.polygon(pantalla, COLOR_MARCO_INTERIOR, puntos_interior, 1)
-
-        color_marco = COLOR_SELECCION_BORDE if seleccionada else COLOR_MARCO
-        pygame.draw.polygon(pantalla, color_marco, puntos, 2)
+        self._paneles.dibujar(pantalla,rect,seleccionada)
 
     @staticmethod
     def _dibujar_brillo_dorado(pantalla, rect):
@@ -613,34 +612,17 @@ class EscenaMenuCriptas(EscenaBase):
             pygame.draw.rect(glow, (*COLOR_SELECCION_BORDE, alpha), inflado, border_radius=3)
         pantalla.blit(glow, (rect.x - grosor, rect.y - grosor))
 
-    @staticmethod
-    def _dibujar_ornamento_titulo(pantalla, rect):
-        """Esquinas con remate (escuadras doradas) y un pequeño diamante
-        metálico centrado arriba, como en el boceto."""
-        tam = 10
-        for cx, cy, sx, sy in (
-            (rect.left, rect.top, 1, 1), (rect.right, rect.top, -1, 1),
-            (rect.left, rect.bottom, 1, -1), (rect.right, rect.bottom, -1, -1),
-        ):
-            puntos = [(cx, cy + sy * tam), (cx, cy), (cx + sx * tam, cy)]
-            pygame.draw.lines(pantalla, COLOR_SELECCION_BORDE, False, puntos, 2)
-
-        cx, cima = rect.centerx, rect.top - 10
-        diamante = [(cx, cima - 8), (cx + 7, cima), (cx, cima + 8), (cx - 7, cima)]
-        pygame.draw.polygon(pantalla, COLOR_MARCO_INTERIOR, diamante)
-        pygame.draw.polygon(pantalla, COLOR_SELECCION_BORDE, diamante, 1)
-
     def _dibujar_titulo(self, pantalla, cantidad):
         rect = self._rect_titulo_actual()
         self._dibujar_placa(pantalla, rect)
-        self._dibujar_ornamento_titulo(pantalla, rect)
+
         pantalla.blit(self._titulo_superficie, self._titulo_superficie.get_rect(center=rect.center))
 
         plural = "s" if cantidad != 1 else ""
         sub_texto = f"{cantidad} cripta{plural} disponible{plural}"
         rect_sub = self._rect_subtitulo_actual(sub_texto)
         self._dibujar_placa(pantalla, rect_sub)
-        texto_sub = self._fuente_chica.render(sub_texto, True, COLOR_SUBTITULO_TEXTO)
+        texto_sub = self._fuente_chica.render(sub_texto, False, COLOR_SUBTITULO_TEXTO)
         pantalla.blit(texto_sub, texto_sub.get_rect(center=rect_sub.center))
 
     def _dibujar_nombre(self, pantalla):
@@ -648,24 +630,31 @@ class EscenaMenuCriptas(EscenaBase):
         seleccionada = self._foco == -1
         self._dibujar_placa(pantalla, rect, seleccionada=seleccionada)
 
-        if self._nombre:
-            texto = f"Nombre: {self._nombre}"
-            color = COLOR_SELECCION_TEXTO if seleccionada else COLOR_TEXTO_PLACA
-        else:
-            texto = f"Nombre: {NOMBRE_POR_DEFECTO}"
-            color = COLOR_PLACEHOLDER_NOMBRE
-        render = self._fuente_normal.render(texto, True, color)
-        centro = render.get_rect(center=rect.center)
-        pantalla.blit(render, centro)
-
-        if seleccionada and (self._tiempo_acumulado // 400) % 2 == 0:
-            x_cursor = centro.right + 3 if self._nombre else centro.left
-            pygame.draw.line(pantalla, COLOR_SELECCION_TEXTO,
-                             (x_cursor, rect.centery - 10), (x_cursor, rect.centery + 10), 2)
+        etiqueta = self._fuente_normal.render('Nombre:',False,COLOR_TEXTO_PLACA)
+        x = rect.x+16
+        pantalla.blit(etiqueta,(x,rect.centery-etiqueta.get_height()//2))
+        x += etiqueta.get_width()+12
+        texto = self._nombre or 'Escribí tu nombre'
+        color = (COLOR_SELECCION_TEXTO if seleccionada else COLOR_TEXTO_PLACA) if self._nombre else COLOR_PLACEHOLDER_NOMBRE
+        render = self._fuente_normal.render(texto,False,color)
+        zona = pygame.Rect(x,rect.y+6,rect.right-x-14,rect.h-12)
+        clip = pantalla.get_clip();pantalla.set_clip(zona)
+        ancho_visible = zona.w-5
+        desplazar = max(0,render.get_width()-ancho_visible) if self._nombre else 0
+        if self._nombre_seleccionado and self._nombre and seleccionada:
+            pygame.draw.rect(pantalla,(90,70,32),(x,rect.centery-12,min(render.get_width(),ancho_visible),24))
+        pantalla.blit(render,(x-desplazar,rect.centery-render.get_height()//2))
+        if seleccionada and (self._tiempo_acumulado//400)%2==0:
+            cursor = x+min(render.get_width(),ancho_visible)+2 if self._nombre else x
+            pygame.draw.line(pantalla,COLOR_SELECCION_TEXTO,(cursor,rect.centery-10),(cursor,rect.centery+10),2)
+        pantalla.set_clip(clip)
+        if self._error_nombre:
+            aviso=self._fuente_chica.render(self._error_nombre,False,COLOR_PELIGRO)
+            pantalla.blit(aviso,aviso.get_rect(midtop=(rect.centerx,rect.bottom+8)))
 
     def _dibujar_lista(self, pantalla, criptas):
         layout = self._layout
-        viewport = pygame.Rect(0, layout.viewport_top, ANCHO_LOGICO,
+        viewport = pygame.Rect(0, layout.viewport_top, self._tamano_layout[0],
                                layout.viewport_bottom - layout.viewport_top)
         clip_anterior = pantalla.get_clip()
         pantalla.set_clip(viewport)
@@ -682,7 +671,7 @@ class EscenaMenuCriptas(EscenaBase):
                 color_texto = COLOR_SELECCION_TEXTO if seleccionada else COLOR_TEXTO_PLACA
                 texto = self._texto_fila(criptas[indice])
                 if self._fondo_limpio:
-                    render = self._fuente_fila.render(texto, True, color_texto)
+                    render = self._fuente_fila.render(texto, False, color_texto)
                 else:
                     render = self._renderizar_fila_ajustada(
                         texto, rect.w - 2 * FILA_MARGEN_INTERNO, color_texto)
@@ -700,27 +689,27 @@ class EscenaMenuCriptas(EscenaBase):
     def _dibujar_mensaje_estado(self, pantalla, texto):
         rect = self._rect_mensaje()
         self._dibujar_placa(pantalla, rect)
-        render = self._fuente_normal.render(texto, True, COLOR_TEXTO_TENUE)
+        render = self._fuente_normal.render(texto, False, COLOR_SUBTITULO_TEXTO)
         pantalla.blit(render, render.get_rect(center=rect.center))
         self._dibujar_relleno_filas_vacias(pantalla, desde=2)
 
     def _dibujar_mensaje_error(self, pantalla, error):
         rect = self._rect_mensaje()
         self._dibujar_placa(pantalla, rect)
-        titulo = self._fuente_normal.render("Error al consultar criptas", True, COLOR_PELIGRO)
+        titulo = self._fuente_normal.render("Error al consultar criptas", False, COLOR_PELIGRO)
         pantalla.blit(titulo, (rect.x + 14, rect.y + 10))
-        detalle = self._fuente_chica.render(str(error)[:70], True, COLOR_TEXTO_PLACA)
+        detalle = self._fuente_chica.render(str(error)[:70], False, COLOR_TEXTO_PLACA)
         pantalla.blit(detalle, (rect.x + 14, rect.y + 36))
-        ayuda = self._fuente_chica.render("R: reintentar   Esc: salir", True, COLOR_AVISO)
+        ayuda = self._fuente_chica.render("R: reintentar   Esc: salir", False, COLOR_AVISO)
         pantalla.blit(ayuda, (rect.x + 14, rect.bottom - 24))
         self._dibujar_relleno_filas_vacias(pantalla, desde=2)
 
     def _dibujar_pie(self, pantalla):
-        texto = "Tab/↑↓ elegir · Enter jugar · Esc salir"
-        pos_y = ALTO_LOGICO - 22
-        sombra = self._fuente_chica.render(texto, True, COLOR_SOMBRA_PLACA)
-        principal = self._fuente_chica.render(texto, True, COLOR_TEXTO_TENUE)
-        rect = principal.get_rect(center=(ANCHO_LOGICO // 2, pos_y))
+        texto = "Tab/Flechas elegir · Enter jugar · F11 pantalla completa · Esc salir"
+        pos_y = self._tamano_layout[1] - 22
+        sombra = self._fuente_chica.render(texto, False, COLOR_SOMBRA_PLACA)
+        principal = self._fuente_chica.render(texto, False, COLOR_SUBTITULO_TEXTO)
+        rect = principal.get_rect(center=(self._tamano_layout[0] // 2, pos_y))
         pantalla.blit(sombra, (rect.x + 2, rect.y + 2))
         pantalla.blit(principal, rect)
 

@@ -103,12 +103,32 @@ def aplicar_modificador_velocidad(reloj, actor, modificador, duracion):
 # Antorcha
 # ---------------------------------------------------------------------------
 
-def encender_antorcha(reloj, antorcha):
-    """Enciende la antorcha y programa su propio apagado tras `duracion`."""
-    if antorcha.encendida or _entrada_pendiente(antorcha.evento_apagado):
+def apagar_antorcha(reloj, antorcha):
+    """Apagado voluntario reversible; la unidad sigue venciendo a la misma hora."""
+    if not antorcha.encendida:
         return False
     reloj.registrar(DeltaAtributos(antorcha, 'encendida'))
+    antorcha.encendida = False
+    return True
+
+
+def encender_antorcha(reloj, antorcha):
+    """Enciende la antorcha y programa su propio apagado tras `duracion`."""
+    if antorcha.encendida:
+        return False
+    pendiente = _entrada_pendiente(antorcha.evento_apagado)
+    if pendiente:
+        # Se reanuda la misma unidad de uso, hasta el vencimiento original.
+        reloj.registrar(DeltaAtributos(antorcha, 'encendida'))
+        antorcha.encendida = True
+        return True
+    if getattr(antorcha, 'usos_restantes', 1) <= 0:
+        return False
+    if not hasattr(antorcha, 'usos_restantes'):
+        antorcha.usos_restantes = 1
+    reloj.registrar(DeltaAtributos(antorcha, 'encendida', 'usos_restantes'))
     antorcha.encendida = True
+    antorcha.usos_restantes -= 1
 
     tiempo = reloj.tiempo_actual + antorcha.duracion
 

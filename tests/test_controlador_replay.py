@@ -175,8 +175,8 @@ def test_accion_rechazada_es_divergencia(tmp_path):
 
 
 def test_acciones_despues_del_final_son_divergencia(tmp_path):
-    # Con la vida normal (30) el jugador muere en la sala de las ratas.
-    ruta, sesion, _ = _jugar(tmp_path, ["N"] + ["A"] * 10, fuente=DatosOffline())
+    # Esperar sin defenderse provoca la derrota también con la vida offline ajustada.
+    ruta, sesion, _ = _jugar(tmp_path, ["N"] + ["W"] * 30, fuente=DatosOffline())
     assert sesion.partida.estado == "derrota"
     _reescribir(ruta, lambda ls: [l for l in ls if " fin " not in l]
                 + ["t=9999 esperar"])

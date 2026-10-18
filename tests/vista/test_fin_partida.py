@@ -11,7 +11,7 @@ from adaptadores.datos_offline import DatosOffline
 from controlador.controlador_juego import ControladorJuego
 from controlador.inicio_partida import nueva_partida
 from herramientas.generar_cripta_prueba import generar
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 
 TIMEOUT = 8.0
 

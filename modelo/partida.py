@@ -83,6 +83,7 @@ class Partida:
         # no cambian el comportamiento de la consola. Los callbacks reciben
         # referencias ya vivas, nunca ejecutan azar ni mutan el modelo.
         self.al_mover_enemigo = Vector()   # f(enemigo, sala_origen, sala_destino)
+        self.al_activar_trampa = Vector()  # f(actor, dano, nombres)
         self.al_atacar = Vector()          # f(atacante, objetivo, dano)
 
         # Función que aplica el efecto de un objeto: f(partida, objeto) -> bool.
@@ -194,8 +195,12 @@ class Partida:
         self._emitir(f"Entras a {sala.nombre}.")
         # la trampa se activa justo después del movimiento.
         vida_antes = self.jugador.vida
+        armadas=[t for t in sala.trampas if t.armada]
         if self.entorno.al_entrar(self.jugador, sala):
             self._emitir(f"¡Una trampa se activa! -{vida_antes - self.jugador.vida} de vida.")
+            nombres=", ".join(t.nombre for t in armadas if not t.armada)
+            for funcion in self.al_activar_trampa:
+                funcion(self.jugador,vida_antes-self.jugador.vida,nombres)
         if self.jugador.vivo:
             self.activar_enemigos(sala)
         self._notificar_entrada(anterior, sala)

@@ -45,7 +45,8 @@ def test_eof_nombre_anonimo(tmp_path,monkeypatch):
     assert datos(tmp_path)[0]['nombre']=='Jugador'
 
 def test_derrota(tmp_path,monkeypatch):
-    monkeypatch.setattr('sys.stdin',io.StringIO('Ana\nN\nW\nW\nW\nW\nW\n'))
+    # Esperas suficientes para llegar a derrota, sin depender de los antiguos 30 de vida.
+    monkeypatch.setattr('sys.stdin',io.StringIO('Ana\nN\n'+'W\n'*30))
     assert juego.main(args(tmp_path))==0
     assert datos(tmp_path)[0]['resultado']=='derrota'
 

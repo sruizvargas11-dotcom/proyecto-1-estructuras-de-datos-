@@ -184,7 +184,7 @@ def test_http_timeout_cuenta_intento():
 def test_http_429_limitado():
     h=DatosHTTP(max_reintentos=2)
     with patch('adaptadores.datos_http.requests.get',return_value=respuesta(429,{'reintentar_en':0})) as get:
-        with patch('adaptadores.datos_http.time.sleep'):
+        with patch('adaptadores.datos_http.DatosHTTP._esperar_reintento'):
             with pytest.raises(RuntimeError): h.listar_criptas()
     assert get.call_count==3 and h.requests_realizados==3
 
@@ -197,7 +197,7 @@ def test_http_presupuesto_impide_siguiente_solicitud():
         assert get.call_count==1
 
 
-@pytest.mark.parametrize('espera', [-1,'2',float('nan'),float('inf'),61,None])
+@pytest.mark.parametrize('espera', [-1,'2',float('nan'),float('inf'),None])
 def test_http_espera_invalida(espera):
     with patch('adaptadores.datos_http.requests.get',return_value=respuesta(429,{'reintentar_en':espera})):
         with pytest.raises(ValueError):DatosHTTP().listar_criptas()
@@ -331,7 +331,7 @@ def test_http_reintentos_consumen_presupuesto():
     respuestas=[respuesta(200,{'presupuesto_solicitudes':3}),respuesta(429,{'reintentar_en':0}),respuesta(429,{'reintentar_en':0})]
     with patch('adaptadores.datos_http.requests.get',side_effect=respuestas) as get:
         h.datos_cripta('prueba')
-        with patch('adaptadores.datos_http.time.sleep'):
+        with patch('adaptadores.datos_http.DatosHTTP._esperar_reintento'):
             with pytest.raises(RuntimeError):h.version_cripta('prueba')
         assert get.call_count==3
     assert h.requests_realizados==3

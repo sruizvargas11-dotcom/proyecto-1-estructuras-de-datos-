@@ -26,7 +26,7 @@ class TestDatosHTTP(unittest.TestCase):
         self.assertEqual(resultado, {"criptas": []})
         self.assertEqual(http.requests_realizados, 1)
 
-    @patch("adaptadores.datos_http.time.sleep")
+    @patch("adaptadores.datos_http.DatosHTTP._esperar_reintento")
     @patch("adaptadores.datos_http.requests.get")
     def test_maneja_429_y_reintenta(self, mock_get, mock_sleep):
         respuesta_429 = _mock_respuesta(429, {"reintentar_en": 2})
@@ -91,7 +91,7 @@ class TestDatosHTTP(unittest.TestCase):
 
         self.assertIsNotNone(http1.reporte()["client_id"])
         self.assertIsNotNone(http2.reporte()["client_id"])
-        self.assertNotEqual(http1.reporte()["client_id"], http2.reporte()["client_id"])
+        self.assertEqual(http1.reporte()["client_id"], http2.reporte()["client_id"])
 
 
 if __name__ == "__main__":

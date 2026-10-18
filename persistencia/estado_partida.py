@@ -32,7 +32,7 @@ MODULOS = (
     'modelo.entidades.objetos.fabrica_objetos',
 )
 OMITIDOS_PARTIDA = ('al_mensaje', 'al_morir_enemigo', 'al_entrar_sala',
-                    'al_mover_enemigo', 'al_atacar',
+                    'al_mover_enemigo', 'al_atacar', 'al_activar_trampa',
                     '_resolver_ficha', 'aplicar_efecto')
 
 
@@ -169,7 +169,10 @@ def _validar_estructuras(objetos):
                 if (type(entrada) is not _EntradaHeap or entrada._propietario is not objeto
                         or not entrada._en_heap or type(entrada.tiempo) is not int
                         or entrada.tiempo < 0 or type(entrada.secuencia) is not int
-                        or not 0 <= entrada.secuencia < objeto.siguiente_secuencia):
+                        or entrada.secuencia < 0
+                        # Un retroceso restaura la secuencia; los eventos nuevos
+                        # cancelados pueden seguir físicamente dentro del heap.
+                        or (entrada.valido and entrada.secuencia >= objeto.siguiente_secuencia)):
                     raise ValueError('Entrada de agenda inconsistente.')
                 if i and objeto._datos.obtenerValor((i-1)//2).clave() > entrada.clave():
                     raise ValueError('Orden del heap inválido.')

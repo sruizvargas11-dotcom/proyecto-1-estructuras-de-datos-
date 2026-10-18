@@ -2,7 +2,7 @@
 
 Interfaces que las escenas, el cargador de assets, el gestor de audio y la cola de
 animaciones deben cumplir para conectarse con app.py y controlador_pygame.py. Las
-firmas están fijadas de antemano (ver CONTRATOS.md) para que mi compañero pueda
+firmas están fijadas de antemano en este módulo para que mi compañero pueda
 implementar sus archivos (componentes, animaciones, escenas de menú/inventario/pausa/
 fin de partida) en paralelo, contra stubs_temporales.py, sin esperar a la escena de
 partida real.
@@ -18,8 +18,8 @@ class EscenaBase(ABC):
     """Una pantalla del juego (menú, partida, inventario, pausa, fin de partida).
 
     contexto expone: controlador, assets, audio, cambiar_escena(id_escena, datos=None).
-    Ver CONTRATOS.md para la forma exacta de 'contexto' y qué trae 'datos' en cada
-    transición entre escenas.
+    Ver Contexto en vista_pygame.app y al_entrar de cada escena para la forma
+    de 'contexto' y qué trae 'datos' en cada transición entre escenas.
     """
 
     def __init__(self, contexto):
@@ -139,7 +139,8 @@ class ColaAnimaciones(ABC):
     @abstractmethod
     def agregar_desde_eventos(self, eventos):
         """eventos: lo que entregó ControladorPygame para el ciclo recién procesado
-        (ver CONTRATOS.md para su forma). No bloquea: encola y vuelve."""
+        (ver EventoAtaque, EventoMovimientoEnemigo y EventoMensaje en controlador_pygame).
+        No bloquea: encola y vuelve."""
         raise NotImplementedError
 
     @abstractmethod
