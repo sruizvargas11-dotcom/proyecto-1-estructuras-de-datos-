@@ -51,6 +51,24 @@ python main.py --offline
 
 Ejecuta los comandos desde la raíz del repositorio. En PyCharm u otro editor, selecciona el intérprete de `.venv` y utiliza esa misma carpeta como directorio de trabajo.
 
+### Ejecutar el juego
+
+Desde la raíz del proyecto:
+
+**Interfaz gráfica**
+
+```powershell
+.\.venv\Scripts\python.exe main.py --gui              # en línea, con el API
+.\.venv\Scripts\python.exe main.py --gui --offline    # sin internet (solo cripta-01)
+```
+
+**Consola**
+
+```powershell
+.\.venv\Scripts\python.exe main.py
+.\.venv\Scripts\python.exe main.py --offline
+```
+
 ## Primera partida
 
 Para empezar con la cripta incluida y sin conexión:
@@ -115,6 +133,7 @@ python main.py --help
 | Opción | Uso |
 | --- | --- |
 | `--offline` | Leer los datos locales. Sin esta opción se usa HTTP. |
+| `--gui` | Abrir la interfaz gráfica (Pygame). No se combina con `--replay`, `--bench` ni `--solo-mapa`. |
 | `--offline-dir CARPETA` | Elegir otra carpeta de datos; requiere `--offline`. |
 | `--cripta ID` | Elegir una cripta sin pasar por el menú. |
 | `--solo-mapa` | Cargar y verificar el mapa sin iniciar una partida. Sin ID explícito usa la primera cripta. |
