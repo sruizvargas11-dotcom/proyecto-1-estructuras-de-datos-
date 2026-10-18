@@ -2,25 +2,86 @@
 (Redacta ROL 1, Revisa ROL 3)
 
 1 - PROBLEMA
-¿Cual es la situación a resolver?
-¿Qué operaciones debería ejecutar el programa?
+El enunciado (§4.10) pide guardar la partida en un archivo binario de formato propio, poder recuperar una sala sin leer el archivo completo, detectar un archivo de otra versión del formato y comparar tamaño y tiempo de carga contra JSON.
+El archivo tiene que permitir continuar la partida exactamente donde quedó: agenda de eventos, historial de retroceso, estado del generador aleatorio, efectos activos y nombre del jugador.
+Operaciones que ejecuta el programa (todas a pedido del jugador: G y L en consola, controlador/controlador_juego.py:521 y :524; no hay guardado automático):
+- Guardar: codificar el estado en registros (persistencia/estado_partida.py:49) y escribir el archivo (persistencia/PartidaBinaria.py:54).
+- Cargar: leer el bloque global (PartidaBinaria.py:139), leer cada sala por el índice (controlador/guardado.py:116-120) y reconstruir el estado (estado_partida.py:87).
+- Recuperar una sala: buscarla en el índice del archivo (PartidaBinaria.py:147).
+Frecuencia medida: cargar lee las S salas del archivo, una por una (6 lecturas en cripta-01 y 400 en la grilla de 400 salas). Un guardado de cripta-01 después de 20 acciones codifica 324 registros; una grilla de 400 salas con todo su contenido, 9 091.
 
 2 - ALTERNATIVAS
-Al menos 2 opciones y la razón concreta por la que una o varias se descartaron
+- Un solo archivo JSON: es legible y, con bloques pequeños, carga todo más rápido (punto 5). Se descarta porque no permite llegar a una sala sin leer y decodificar el archivo completo, que es lo que exige §4.10: con 5 000 salas, leer una sala cuesta 8.420 ms en JSON contra 0.029 ms con el índice.
+- pickle: guardaría el estado sin escribir un codificador. Se descarta porque cargar un pickle puede ejecutar código del archivo y el formato depende de las clases de Python; estado_partida.py:4 lo excluye y solo reconstruye tipos de una lista permitida (estado_partida.py:19-33).
+- Formato propio: contenedor binario con encabezado, índice ordenado y un bloque por sala. Es la alternativa elegida.
 
 3 - DECISIÓN
-Estrategia implementada y cómo se estructuró en el programa
+Formato CRPT (persistencia/PartidaBinaria.py:38-47):
+- Encabezado de 12 bytes: marca "CRPT" (PartidaBinaria.py:8, :96), versión de formato 1 (:9, :97), cantidad de salas en 2 bytes (:98) y posición donde empiezan los bloques (:99).
+- Índice: un par (sala_id, offset) de 8 bytes por sala, ordenado por sala_id con el ordenamiento propio (:67, :101-105).
+- Bloque global (longitud + JSON) y un bloque por sala (sala_id + longitud + JSON) (:107-117).
+Recuperar una sala: búsqueda binaria directamente sobre el índice en disco, leyendo una entrada de 8 bytes por paso (:167-186); luego salta al bloque y comprueba que el sala_id del bloque coincida (:159-163).
+Detección de archivos inválidos:
+- Otra versión: marca distinta (:123-127), versión de formato distinta (:128-133), esquema de estado distinto de 2 (controlador/guardado.py:20, :106-110) o cripta, versión de cripta o versión de catálogo distintas (guardado.py:111-114).
+- Truncado o dañado: lectura incompleta (PartidaBinaria.py:19-20), longitud o índice fuera del archivo (:25-26, :134-136, :159-160), sala faltante (guardado.py:116-119), tipos, referencias, listas y heap inconsistentes (estado_partida.py:87-178) y estado que no está en una decisión del jugador (guardado.py:130-134). Todo se reporta como "Guardado dañado o incompatible" (guardado.py:160-162) y la sesión en curso no se reemplaza.
+- Escritura atómica: se escribe un temporal en la misma carpeta y se reemplaza con os.replace (guardado.py:89-98).
+Qué se guarda: codificar recorre desde la partida, el estado de red, las acciones, las fichas protegidas y los mensajes (guardado.py:60-67). Conserva identidades y ciclos (estado_partida.py:53-64): agenda con sus handles, historial de deltas, generador aleatorio (estado_partida.py:74-75), efectos y fichas en memoria (ListaLRU, guardado.py:15-16). El bloque global agrega el esquema 2 y el nombre del jugador (guardado.py:68-70). Los registros alcanzables desde una sala van al bloque de esa sala (estado_partida.py:63, guardado.py:71-88).
+Qué no se guarda: los callbacks de la partida (estado_partida.py:34-36, :80-81), que se reconstruyen al cargar (guardado.py:145-147), y la caché en disco: la sesión cargada reutiliza la carpeta de caché de la sesión actual (guardado.py:135-136).
+Ajuste F4B-01: un pergamino restaura la secuencia de la agenda, pero los eventos cancelados del intervalo revertido siguen físicamente en el heap con una secuencia mayor. La validación rechazaba ese guardado al cargarlo; ahora la regla de rango solo se aplica a las entradas válidas (estado_partida.py:169-176). Sin el ajuste, un guardado hecho después de P no se podía cargar ("Entrada de agenda inconsistente").
 
 4 - COMPLEJIDAD ALGORÍTMICA
-Por lo menos la de la operación más frecuente
+Notación: S = salas, R = registros codificados, B = bytes del archivo, b = bytes de un bloque.
+- Recuperar una sala: O(log S) lecturas de 8 bytes del índice, más O(b) para leer su bloque. Medido: de 0.016 a 0.029 ms entre 50 y 5 000 salas.
+- Escribir el archivo (PartidaBinaria.guardar): O(S log S) para ordenar el índice, más O(B) para escribir.
+- Guardar completo: codificar busca cada objeto en un ArrayOrdenado de referencias (O(log R)) y lo inserta (O(R) por desplazamiento, estado_partida.py:59-62): O(R²) en total.
+- Cargar completo: S lecturas por índice (O(S log S)), ordenar los registros (O(R log R), guardado.py:121-125) y reconstruirlos (O(R)).
 
 5 - EVIDENCIA
-Tabla del --bench que incluya:
-• repeticiones
-• mediana de rendimiento
-• equipo utilizado
-1 para la alternativa utilizada y otra/s para la/s alternativa/s descartada/s
+Equipo: Linux 6.18 x86_64 (contenedor), 2 núcleos, Python 3.13.16. Fecha: 2026-10-18. Rama feature/vista-pygame (7946b1a).
+Repeticiones: 5 por medición, más 1 de calentamiento que no se cuenta; se reporta la mediana en ms.
+
+5.1 --bench, casos guardado, carga_total y carga_1_sala (bench/casos/binario_json.py; estado sintético, el mismo para binario y JSON)
+  salas  operación        binario (usado)  JSON (descartado)
+  50     guardar          0.719 ms         0.857 ms
+  50     tamaño           11 978 B         11 964 B
+  50     leer todo        0.272 ms         0.071 ms
+  50     leer 1 sala      0.016 ms         0.071 ms
+  500    guardar          4.040 ms         4.536 ms
+  500    tamaño           118 609 B        118 996 B
+  500    leer todo        2.495 ms         0.739 ms
+  500    leer 1 sala      0.017 ms         0.739 ms
+  5 000  guardar          36.955 ms        36.152 ms
+  5 000  tamaño           1 186 399 B      1 195 115 B
+  5 000  leer todo        24.922 ms        8.420 ms
+  5 000  leer 1 sala      0.029 ms         8.420 ms
+JSON no tiene índice: para leer una sala hay que leer el archivo completo, por eso el bench repite ese tiempo.
+
+5.2 Estado real del juego (script de medición, mismos datos codificados en los dos formatos)
+  caso        salas  registros  binario      JSON         escribir bin/JSON   leer todo bin/JSON  leer 1 sala bin  guardar completo  cargar completo
+  cripta-01   6      324        122 182 B    122 121 B    1.500 / 7.732 ms    1.437 / 1.007 ms    0.060 ms         13.471 ms         6.479 ms
+  grilla      25     586        181 451 B    181 220 B    2.423 / 11.665 ms   1.750 / 1.547 ms    0.052 ms         34.793 ms         11.184 ms
+  grilla      100    2 271      691 297 B    690 392 B    7.323 / 39.161 ms   6.512 / 7.626 ms    0.059 ms         399.007 ms        45.279 ms
+  grilla      400    9 091      2 767 950 B  2 764 645 B  27.073 / 155.972 ms 29.843 / 31.663 ms  0.061 ms         5 518.372 ms      246.039 ms
+cripta-01: datos offline, semilla 3, después de N y 19 esperas. Grillas: datos sintéticos de bench/bench_precarga.py con el contenido de todas las salas cargado (1 enemigo, 1 objeto y 1 trampa por sala).
+
+Lectura:
+- El tamaño es prácticamente igual en los dos formatos (diferencias menores a 0.8 %): el contenedor binario guarda JSON dentro de cada bloque.
+- Leer una sala con el índice cuesta lo mismo con 6 que con 5 000 salas (0.016 a 0.061 ms). En JSON crece con el archivo.
+- Leer todo: con bloques sintéticos pequeños JSON es hasta 3.8 veces más rápido (0.272 contra 0.071 ms con 50 salas), porque el binario hace dos lecturas y un json.loads por bloque. Con bloques del juego real los dos quedan parejos (29.843 contra 31.663 ms con 400 salas). Se eligió el binario porque §4.10 exige recuperar una sala sin leer todo, y ese costo no crece con la cripta.
+- El tiempo de guardar del juego no lo domina el formato sino codificar: con 400 salas, escribir el archivo toma 27 ms y el guardado completo 5 518 ms. En un perfil con cProfile del guardado de 100 salas, el 94 % del tiempo está en ArrayOrdenado.insertar.
+
+Pruebas: tests/test_bloque3.py (21), tests/test_persistencia.py (13), tests/test_consola_persistencia_replay.py (31) y tests/test_regresion_guardado_retroceso.py (8, F4B-01): 73 aprobadas.
+
+Comandos utilizados (desde la raíz del repositorio):
+.\venv\Scripts\python.exe main.py --bench
+.\venv\Scripts\python.exe ..\mediciones\medir_guardado_bitacora.py --salida ..\mediciones\2026-10-18-guardado-bitacora.json
+.\venv\Scripts\python.exe ..\mediciones\perfil_guardar.py
+.\venv\Scripts\python.exe -m pytest tests\test_bloque3.py tests\test_persistencia.py tests\test_consola_persistencia_replay.py tests\test_regresion_guardado_retroceso.py -v
 
 6 - LÍMITES
-Condiciones en las que la decisión deja de ser apropiada
-Incluir datos cuando sea posible
+- Partidas con muchos objetos: guardar crece como O(R²) por el ArrayOrdenado de referencias de codificar (estado_partida.py:59-62). Con 2 271 registros tarda 0.4 s y con 9 091, 5.5 s. En una cripta más grande que las de desarrollo (§9), G puede congelar el juego varios segundos.
+- El juego no aprovecha el índice al cargar: L lee todas las salas, una por una, abriendo el archivo cada vez (guardado.py:116-120). Con 400 salas, leer el archivo toma unos 30 ms y la carga completa 246 ms; la ventaja del índice aparece al consultar una sala, no en L.
+- Con bloques muy pequeños, leer todo es más lento que un JSON único (24.922 contra 8.420 ms con 5 000 salas sintéticas).
+- La cantidad de salas se guarda en 2 bytes (PartidaBinaria.py:98): máximo 65 535 salas por archivo. Offsets y longitudes usan 4 bytes: el archivo no puede pasar de 4 GiB.
+- No hay suma de verificación: un cambio dentro de un bloque que siga siendo JSON válido y pase las validaciones de tipos no se detecta.
+- No hay migración: un guardado de otro esquema, cripta o catálogo se rechaza y no se puede abrir.
