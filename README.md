@@ -21,7 +21,7 @@ El proyecto utiliza estructuras de datos propias para resolver problemas del jue
 
 ## Instalación
 
-El entorno de referencia es **Python 3.12**. La última validación local se realizó con Python 3.12.14 en Windows 11. Las dependencias están en [requirements.txt](requirements.txt): `requests` para el acceso HTTP y `pytest` para las pruebas. No hace falta configurar una base de datos.
+El entorno de referencia es **Python 3.12**. La última validación local se realizó con Python 3.12.14 en Windows 11. Las dependencias están en [requirements.txt](requirements.txt): `requests` para el acceso HTTP, `pytest` para las pruebas y `pygame` para la vista gráfica (`--gui`). No hace falta configurar una base de datos.
 
 Clona el repositorio y entra en su carpeta:
 
@@ -104,6 +104,67 @@ Los comandos aceptan mayúsculas y minúsculas. Los índices empiezan en 1; si u
 
 El pergamino puede revertir los cambios del jugador, enemigos y efectos incluidos en el último intervalo registrado. El historial conserva hasta cinco intervalos. El propio pergamino se consume de forma irreversible y no genera una nueva acción que pueda deshacerse.
 
+## Vista gráfica (Pygame)
+
+```console
+python main.py --offline --gui
+```
+
+`--gui` reemplaza la consola por una ventana Pygame (1280×720, 60 FPS); el resto
+de las opciones (`--offline`, `--cache-dir`, `--cache-size`, `--partidas-dir`...) se
+aplican igual. `--gui` no se puede combinar con `--replay`, `--bench` ni
+`--solo-mapa`: esos modos nunca cargan pygame (ver [vista_pygame/](vista_pygame/) y
+[ANALISIS_ARQUITECTURA.md](ANALISIS_ARQUITECTURA.md)).
+
+El modelo del juego es exactamente el mismo que usa la consola: corre en un hilo de
+fondo detrás de un controlador que traduce las teclas a los mismos comandos de texto
+(`N`, `A`, `W`...), así que una partida jugada desde la GUI genera la misma bitácora y
+se puede reproducir con `--replay` igual que una de consola.
+
+### Portada (selección de cripta)
+
+La pantalla inicial de `--gui` lista las criptas que devuelve el mismo
+`controlador.listar_criptas()` que usa la consola (nada fijo en el código: funciona
+igual con 1, 4 o 15 criptas, con scroll automático si no caben). El fondo es
+`assets/ui/portada.png`; si no está presente se usa un color sólido de la paleta, sin
+romper.
+
+| Tecla / acción | Efecto |
+| --- | --- |
+| Escribir / Retroceso | Edita el nombre del jugador (máx. 20 caracteres) cuando tiene el foco |
+| Tab / Shift+Tab | Siguiente/anterior elemento: nombre → criptas → nombre |
+| Flechas ↑ / ↓ | Moverse entre criptas |
+| Enter / clic sobre una cripta | Inicia la partida con esa cripta y el nombre escrito |
+| Enter sobre el nombre | Pasa el foco a la primera cripta |
+| R | Reintentar la consulta de criptas si falló |
+| Esc | Salir del juego |
+
+Al volver desde el fin de una partida, se regresa a esta misma pantalla.
+
+| Tecla | Acción |
+| --- | --- |
+| Flechas / WASD | Moverse (N/S/E/O) |
+| Shift + flecha/WASD | Abrir la puerta en esa dirección |
+| Espacio | Atacar al enemigo seleccionado |
+| Tab | Cambiar la selección de objetivo |
+| X | Esperar |
+| R | Recoger (primer objeto del suelo) |
+| F | Soltar (primer objeto del inventario) |
+| U | Usar (primer objeto del inventario) |
+| C | Equipar (primer objeto del inventario) |
+| P | Pergamino de retroceso |
+| G / L | Guardar / cargar (ruta por defecto) |
+| I | Abrir el inventario |
+| Esc | Pausa |
+| F1 | Ayuda |
+| F5 | Mostrar u ocultar el minimapa |
+
+El arte, el audio y las animaciones reales están a cargo de otro rol del equipo; hasta
+que esos archivos existan, el inventario, la pausa y el fin de partida usan
+rectángulos de colores y sonido silencioso (`vista_pygame/stubs_temporales.py`),
+suficientes para jugar una partida completa de punta a punta. La portada
+(`vista_pygame/escenas/menu_criptas.py`) ya es la implementación real.
+
 ## Opciones de ejecución
 
 La ayuda disponible en el programa se consulta con:
@@ -126,6 +187,7 @@ python main.py --help
 | `--silencioso` | Omitir el detalle de acciones durante el replay. |
 | `--reportes ARCHIVO` | Cambiar el archivo del historial de reportes de red. |
 | `--bench` | Ejecutar las mediciones de estructuras y persistencia. |
+| `--gui` | Jugar con la vista Pygame en vez de la consola. No se combina con `--replay`, `--bench` ni `--solo-mapa`. |
 
 `--bench` y `--replay` son modos excluyentes. El benchmark utiliza sus propios datos y tamaños; las opciones de partida, como `--cache-size`, no configuran sus casos. La opción `--hilos` de `main.py` se aplica a partidas nuevas; los ensayos de replay con latencias se ejecutan mediante la herramienta de determinismo.
 
@@ -248,6 +310,7 @@ La consola recibe los comandos; el controlador los valida y coordina el trabajo 
 ```text
 main.py
 ├── vista/          Entrada por consola y presentación del estado
+├── vista_pygame/   Vista gráfica (--gui): mismo modelo, otro controlador/vista
 ├── controlador/    Acciones, carga de datos, replay, guardado y reportes
 ├── modelo/         Mundo, entidades, reloj, efectos e historial
 ├── estructuras/    Implementaciones propias de los tipos de datos
@@ -256,9 +319,17 @@ main.py
 ├── bench/          Casos de medición y calibración del ordenamiento
 ├── herramientas/   Descarga, comparación y ensayos reproducibles
 ├── tests/          Pruebas unitarias, de integración y de regresión
+│   └── vista/      Pruebas de vista_pygame (SDL_VIDEODRIVER/AUDIODRIVER=dummy)
 ├── datos_offline/  Datos incluidos para jugar sin conexión
 └── docs/           Decisiones técnicas, informes y evidencias
 ```
+
+La vista Pygame no toca el modelo directamente: `vista_pygame/controlador_pygame.py`
+corre el mismo `ControladorJuego` de la consola en un hilo de fondo (una "vista"
+suya más, con el mismo protocolo) y publica fotos de solo lectura del estado para que
+la ventana las dibuje. El diseño completo, con sus condiciones de seguridad entre
+hilos, está en [ANALISIS_ARQUITECTURA.md](ANALISIS_ARQUITECTURA.md) y
+[CONTRATOS.md](CONTRATOS.md).
 
 ### Estructuras y dónde se usan
 
@@ -294,6 +365,13 @@ python -m pytest -q
 ```
 
 La suite bloquea las solicitudes HTTP reales y usa datos locales, fuentes simuladas y carpetas temporales. Incluye pruebas de estructuras, validación de datos, persistencia, combate, efectos, inventario, retroceso, comandos, caché, replay y determinismo.
+
+[tests/vista/](tests/vista/) prueba la vista Pygame: el controlador en su hilo de
+fondo, el mapeo de teclas, el render de sala/enemigos, la paridad con la consola
+(misma semilla y acciones → mismo estado final y mismo `.log`) y que `--replay`/
+`--bench` nunca cargan pygame. `tests/vista/conftest.py` fija
+`SDL_VIDEODRIVER=dummy` y `SDL_AUDIODRIVER=dummy` automáticamente: no hace falta
+pantalla ni audio real, ni configurarlo a mano.
 
 Para ejecutar solo las pruebas del cierre del rol 2:
 
