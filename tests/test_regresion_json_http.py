@@ -14,7 +14,7 @@ def test_json_ilegible_informa_operacion_estado_y_cuenta_intento(estado):
         'Expecting value', '<html>error</html>', 0)
     fuente = DatosHTTP()
     with patch('adaptadores.datos_http.requests.get', return_value=respuesta), \
-            patch('adaptadores.datos_http.time.sleep') as esperar:
+            patch('adaptadores.datos_http.DatosHTTP._esperar_reintento') as esperar:
         with pytest.raises(ValueError) as error:
             fuente.listar_criptas()
     mensaje = str(error.value)

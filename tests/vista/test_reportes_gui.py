@@ -6,7 +6,7 @@ from adaptadores.datos_offline import DatosOffline
 from herramientas.generar_cripta_prueba import generar
 from controlador.reporte_red import HistorialReportesRed
 from vista_pygame.app import AppPygame
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 from tests.vista.test_controlador_pygame import _esperar
 
 

@@ -4,7 +4,7 @@ import pygame
 import pytest
 from vista_pygame.recursos.cargador_assets import CargadorAssets
 from vista_pygame.render.reja_animada import dibujar_rejas, fotogramas_reja, pared_tapiada
-from vista_pygame.controlador_pygame import SalidaVisual, construir_estado
+from controlador.controlador_pygame import SalidaVisual, construir_estado
 from vista_pygame.config_vista import ESCENA_PARTIDA, ESCENA_FIN_PARTIDA
 from tests.vista.test_cinematica_cripta import app, esperar
 

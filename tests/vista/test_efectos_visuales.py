@@ -5,7 +5,7 @@ from adaptadores.datos_offline import DatosOffline
 from controlador.guardado import cargar, guardar
 from controlador.inicio_partida import nueva_partida
 from modelo.efectos import aplicar_modificador_velocidad
-from vista_pygame.controlador_pygame import construir_estado
+from controlador.controlador_pygame import construir_estado
 
 
 @pytest.fixture

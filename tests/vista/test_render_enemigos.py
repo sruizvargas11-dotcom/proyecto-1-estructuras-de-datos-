@@ -13,7 +13,7 @@ from adaptadores.datos_offline import DatosOffline
 from controlador.inicio_partida import nueva_partida
 from herramientas.generar_cripta_prueba import generar
 from vista_pygame.config_vista import MAX_ENEMIGOS_VISIBLES
-from vista_pygame.controlador_pygame import ActorVisual, ControladorPygame, EstadoPartida, SalidaVisual
+from controlador.controlador_pygame import ActorVisual, ControladorPygame, EstadoPartida, SalidaVisual
 from vista_pygame.render.render_actores import dibujar_enemigos, siguiente_objetivo
 from vista_pygame.stubs_temporales import CargadorAssetsTemporal
 

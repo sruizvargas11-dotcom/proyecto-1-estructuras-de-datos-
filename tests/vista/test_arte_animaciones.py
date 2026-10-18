@@ -5,7 +5,7 @@ import pytest
 
 from vista_pygame.recursos.cargador_assets import CargadorAssets
 from vista_pygame.render.animaciones import ColaAnimaciones, DURACION_ATAQUE_MS
-from vista_pygame.controlador_pygame import EventoAtaque, EventoMensaje
+from controlador.controlador_pygame import EventoAtaque, EventoMensaje
 from tests.vista.test_render_enemigos import _estado, _enemigo
 from vista_pygame.escenas.partida import EscenaPartida
 from vista_pygame.config_vista import ESCENA_FIN_PARTIDA

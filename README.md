@@ -255,7 +255,7 @@ Si el log no tiene cierre, el programa informa que reprodujo las acciones pero n
 
 [FuenteDeDatos](adaptadores/fuente_datos.py) define las consultas comunes a las fuentes: listado de criptas, datos generales, mapa paginado, contenido de salas, catálogo y versiones.
 
-- **DatosHTTP** consulta el servicio configurado en `adaptadores/datos_http.py`. Identifica al cliente mediante `X-Cripta-Client-Id`, cuenta los intentos y respeta el presupuesto de solicitudes recibido para la cripta. También limita los reintentos ante respuestas 429.
+- **DatosHTTP** consulta el servicio configurado en `adaptadores/datos_http.py`. Identifica al cliente mediante `X-Cripta-Client-Id`, cuenta los intentos y respeta el presupuesto de solicitudes recibido para la cripta. Ante HTTP 429 espera el tiempo indicado y reintenta mientras quede presupuesto. Las esperas pueden cancelarse al cerrar la ventana; no avanzan el reloj virtual. Un límite adicional de reintentos es opcional para usos de diagnóstico.
 - **DatosOffline** responde a las mismas consultas leyendo archivos JSON. La ruta predeterminada es `datos_offline/`.
 - **DatosSimulado** envuelve una fuente y añade demoras reproducibles para las pruebas. No altera el reloj virtual ni el generador aleatorio de la partida.
 
@@ -309,7 +309,7 @@ Cada registro nuevo se agrega al final y se ordena con InsertionSort. Como el re
 
 Al terminar una partida o un replay, se muestra un reporte y se conserva en `partidas/reportes_red.txt`. Incluye solicitudes realizadas, presupuesto, uso de la caché, aciertos y fallos de la LRU y esperas de precarga. Una pila propia conserva los 50 reportes más recientes, con el último al principio.
 
-Actualmente `--bench` imprime sus tablas de rendimiento y termina sin emitir este reporte de red.
+Al terminar, `--bench` también registra un reporte de mediciones locales; no realiza solicitudes HTTP.
 
 ## Arquitectura
 
@@ -318,8 +318,8 @@ La consola recibe los comandos; el controlador los valida y coordina el trabajo 
 ```text
 main.py
 ├── vista/          Entrada por consola y presentación del estado
-├── vista_pygame/   Vista gráfica (--gui): mismo modelo, otro controlador/vista
-├── controlador/    Acciones, carga de datos, replay, guardado y reportes
+├── vista_pygame/   Escenas, renderizado y entrada de la interfaz gráfica
+├── controlador/    Controladores de consola/gráfico, carga, replay, guardado y reportes
 ├── modelo/         Mundo, entidades, reloj, efectos e historial
 ├── estructuras/    Implementaciones propias de los tipos de datos
 ├── adaptadores/    Fuentes HTTP, offline y con latencia simulada
@@ -332,7 +332,7 @@ main.py
 └── docs/           Decisiones técnicas, informes y evidencias
 ```
 
-La vista Pygame no toca el modelo directamente: `vista_pygame/controlador_pygame.py`
+La vista Pygame no toca el modelo directamente: `controlador/controlador_pygame.py`
 corre el mismo `ControladorJuego` de la consola en un hilo de fondo (una "vista"
 suya más, con el mismo protocolo) y publica fotos de solo lectura del estado para que
 la ventana las dibuje. El diseño completo, con sus condiciones de seguridad entre

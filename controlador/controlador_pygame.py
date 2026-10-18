@@ -505,10 +505,17 @@ class ControladorPygame:
             with self._lock:
                 self._reporte_red = texto.splitlines()
 
+    def cancelar_red(self):
+        """El cierre de la vista cancela esperas HTTP sin tocar el reloj virtual."""
+        cancelar = getattr(self._fuente, 'cancelar_pendientes', None)
+        if callable(cancelar):
+            cancelar()
+
     def salir(self):
         """Cierre ordenado: pide salir y espera a que el hilo termine de
         verdad (cierra bitácora y red) antes de volver. Nunca lo abandona a
         medias confiando en que sea un hilo daemon."""
+        self.cancelar_red()
         if self._hilo is None:
             return
         self._comandos.put("Q")

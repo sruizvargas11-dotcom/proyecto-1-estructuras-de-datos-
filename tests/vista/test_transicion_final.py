@@ -5,7 +5,7 @@ from adaptadores.datos_offline import DatosOffline
 from herramientas.generar_cripta_prueba import generar
 from vista_pygame.app import AppPygame
 from vista_pygame.config_vista import ESCENA_PARTIDA, ESCENA_FIN_PARTIDA, ESCENA_MENU
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 from tests.vista.test_fin_partida import _esperar, COMANDOS_VICTORIA
 
 

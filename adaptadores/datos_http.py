@@ -1,7 +1,8 @@
 """Consultas al servicio de CRIPTA, con control de presupuesto y reintentos."""
 
-import time
+import threading
 import uuid
+from math import isfinite
 
 import requests
 
@@ -14,21 +15,37 @@ CLIENT_ID_EJECUCION = str(uuid.uuid4())
 class DatosHTTP(FuenteDeDatos):
     """Obtiene los datos de la cripta a través de la interfaz FuenteDeDatos."""
 
-    def __init__(self, max_reintentos=3):
-        if type(max_reintentos) is not int or max_reintentos < 0:
-            raise ValueError("max_reintentos debe ser un entero no negativo")
+    def __init__(self, max_reintentos=None):
+        if max_reintentos is not None and (type(max_reintentos) is not int or max_reintentos < 0):
+            raise ValueError("max_reintentos debe ser None o un entero no negativo")
         self._max_reintentos = max_reintentos
         self._base_url = BASE_URL
         self._client_id = CLIENT_ID_EJECUCION
         self._headers = {"X-Cripta-Client-Id": self._client_id}
         self._contador = 0
         self._presupuesto = None
+        self._lock = threading.Lock()
+        self._cancelacion = threading.Event()
 
 
 
     def para_nueva_partida(self):
         """Otra partida con la misma identidad; conserva las métricas del anterior."""
         return DatosHTTP(max_reintentos=self._max_reintentos)
+
+    def cancelar_pendientes(self):
+        """Interrumpe esperas de 429 al cerrar; no reinicia el presupuesto."""
+        self._cancelacion.set()
+
+    def _esperar_reintento(self, segundos):
+        # Los tramos cortos permiten cancelar; su suma conserva la espera
+        # indicada por el servidor, sin imponerle un máximo de 60 segundos.
+        restante = segundos
+        while restante > 0:
+            tramo = min(30, restante)
+            if self._cancelacion.wait(tramo):
+                raise RuntimeError('Espera de reintento HTTP cancelada.')
+            restante -= tramo
 
     @staticmethod
     def _leer_json(respuesta, ruta):
@@ -45,9 +62,12 @@ class DatosHTTP(FuenteDeDatos):
         """Ejecuta un GET y cuenta cada intento dentro del presupuesto disponible."""
         reintentos = 0
         while True:
-            if self._presupuesto is not None and self._contador >= self._presupuesto:
-                raise RuntimeError(f"Presupuesto de solicitudes agotado al consultar GET {ruta}.")
-            self._contador += 1
+            if self._cancelacion.is_set():
+                raise RuntimeError(f"GET {ruta}: consulta cancelada.")
+            with self._lock:
+                if self._presupuesto is not None and self._contador >= self._presupuesto:
+                    raise RuntimeError(f"Presupuesto de solicitudes agotado al consultar GET {ruta}.")
+                self._contador += 1
             try:
                 respuesta = requests.get(
                     f"{self._base_url}{ruta}", headers=self._headers,
@@ -60,15 +80,19 @@ class DatosHTTP(FuenteDeDatos):
                 return self._leer_json(respuesta, ruta)
 
             if respuesta.status_code == 429:
-                if reintentos >= self._max_reintentos:
+                if self._max_reintentos is not None and reintentos >= self._max_reintentos:
                     raise RuntimeError(f"GET {ruta}: el servidor sigue ocupado; límite de reintentos alcanzado.")
                 if self._presupuesto is not None and self._contador >= self._presupuesto:
                     raise RuntimeError(f"Presupuesto de solicitudes agotado al consultar GET {ruta}.")
                 datos = self._leer_json(respuesta, ruta)
                 espera = datos.get("reintentar_en", 5)
-                if type(espera) not in (int, float) or not 0 <= espera <= 60:
-                    raise ValueError("Intervalo de reintento inválido o mayor de 60 segundos.")
-                time.sleep(espera)
+                if (type(espera) not in (int, float) or espera < 0
+                        or (type(espera) is float and not isfinite(espera))):
+                    raise ValueError(f"GET {ruta}: reintentar_en debe ser un número finito no negativo.")
+                try:
+                    self._esperar_reintento(espera)
+                except RuntimeError as error:
+                    raise RuntimeError(f"GET {ruta}: {error}") from error
                 reintentos += 1
                 continue
 
@@ -89,9 +113,10 @@ class DatosHTTP(FuenteDeDatos):
         presupuesto = respuesta.get("presupuesto_solicitudes")
         if type(presupuesto) is not int or presupuesto < 0:
             raise ValueError("Presupuesto de solicitudes inválido.")
-        self._presupuesto = presupuesto
-        if self._contador > presupuesto:
-            raise RuntimeError("La carga inicial ya excedió el presupuesto informado.")
+        with self._lock:
+            self._presupuesto = presupuesto
+            if self._contador > presupuesto:
+                raise RuntimeError("La carga inicial ya excedió el presupuesto informado.")
         return respuesta
 
 

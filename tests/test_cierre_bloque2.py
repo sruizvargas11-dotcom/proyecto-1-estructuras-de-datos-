@@ -313,7 +313,7 @@ def test_429_cuenta_y_presupuesto_impide_get_adicional():
     with patch('adaptadores.datos_http.requests.get', return_value=_mock_respuesta(200, {'presupuesto_solicitudes': 2})):
         fuente.datos_cripta('cripta-01')
     with patch('adaptadores.datos_http.requests.get', return_value=_mock_respuesta(429, {'reintentar_en': 0})) as get:
-        with patch('adaptadores.datos_http.time.sleep'):
+        with patch('adaptadores.datos_http.DatosHTTP._esperar_reintento'):
             with pytest.raises(RuntimeError, match='/criptas'):
                 fuente.listar_criptas()
     assert get.call_count == 1

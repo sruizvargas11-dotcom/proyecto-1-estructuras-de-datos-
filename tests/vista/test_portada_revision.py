@@ -6,7 +6,7 @@ from vista_pygame.escenas.menu_criptas import COLOR_PLACEHOLDER_NOMBRE
 from vista_pygame.render.portada_animada import PortadaAnimada
 from vista_pygame.recursos.cargador_assets import CargadorAssets
 from vista_pygame.render.rig_actores import cuadros_jugador,cuadros_rata
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 from adaptadores.datos_offline import DatosOffline
 
 

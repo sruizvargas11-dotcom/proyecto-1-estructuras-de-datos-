@@ -2,7 +2,7 @@
 import pytest
 from tests.test_equipo_interactivo import jugar
 from tests.vista.test_cinematica_cripta import app
-from vista_pygame.controlador_pygame import construir_estado
+from controlador.controlador_pygame import construir_estado
 from vista_pygame.render.panel_equipo import PanelEquipo
 
 

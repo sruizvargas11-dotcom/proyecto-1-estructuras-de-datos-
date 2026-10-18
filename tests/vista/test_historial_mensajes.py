@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pygame
 import pytest
 
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 from vista_pygame.escenas.partida import EscenaPartida, MENSAJES_RECT
 from tests.vista.test_menu_criptas import ContextoFalso
 

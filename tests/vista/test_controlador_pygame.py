@@ -9,7 +9,7 @@ import pytest
 
 from adaptadores.datos_offline import DatosOffline
 from herramientas.generar_cripta_prueba import generar
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 
 TIMEOUT = 5.0
 

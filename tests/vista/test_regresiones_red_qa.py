@@ -9,7 +9,7 @@ import pytest
 from adaptadores.datos_http import DatosHTTP
 from adaptadores.datos_offline import DatosOffline
 from herramientas.generar_cripta_prueba import generar
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 from vista_pygame.escenas.menu_criptas import EscenaMenuCriptas
 from tests.vista.test_menu_criptas import ContextoFalso
 
@@ -55,7 +55,7 @@ def test_dos_partidas_http_comparten_uuid_y_preservan_contadores(tmp_path):
     contadores = []
     try:
         with patch('adaptadores.datos_http.requests.get', responder), \
-                patch('adaptadores.datos_http.time.sleep'):
+                patch('adaptadores.datos_http.DatosHTTP._esperar_reintento'):
             for semilla in (72, 73):
                 c.listar_criptas()
                 c.iniciar_partida('cripta-prueba', 'QA', semilla)

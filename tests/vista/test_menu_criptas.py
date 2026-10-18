@@ -17,7 +17,7 @@ import pytest
 from adaptadores.datos_http import DatosHTTP
 from adaptadores.datos_offline import DatosOffline
 from herramientas.generar_cripta_prueba import generar
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 from vista_pygame.escenas.menu_criptas import (
     COLOR_FLECHA, MARGEN_TITULO_INTERNO, NOMBRE_POR_DEFECTO, EscenaMenuCriptas,
 )

@@ -6,7 +6,7 @@ from vista_pygame.recursos.cargador_assets import CargadorAssets
 from vista_pygame.render.rig_actores import cuadros_jugador
 from vista_pygame.render.animaciones import ColaAnimaciones, DURACION_ATAQUE_MS
 from vista_pygame.render.fuego_vista import FuegoAntorcha
-from vista_pygame.controlador_pygame import EventoAtaque
+from controlador.controlador_pygame import EventoAtaque
 from vista_pygame.render.render_actores import dibujar_jugador, dibujar_enemigos
 from tests.vista.test_render_enemigos import _estado,_enemigo
 

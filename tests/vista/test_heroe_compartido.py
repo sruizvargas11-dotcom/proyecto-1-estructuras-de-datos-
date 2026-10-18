@@ -5,7 +5,7 @@ from vista_pygame.recursos.cargador_assets import CargadorAssets
 from vista_pygame.render.portada_animada import PortadaAnimada
 from vista_pygame.render.animaciones import ColaAnimaciones, DURACION_ATAQUE_MS
 from vista_pygame.render.ojo_torre import cargar_ojo, cuadro_ojo
-from vista_pygame.controlador_pygame import EventoAtaque
+from controlador.controlador_pygame import EventoAtaque
 
 
 def test_partida_y_muerte_usan_las_imagenes_cargadas_del_atlas():

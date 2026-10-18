@@ -2,7 +2,7 @@
 from types import SimpleNamespace
 import pygame
 import pytest
-from vista_pygame.controlador_pygame import ObjetoVisual, SalidaVisual, EventoTrampa
+from controlador.controlador_pygame import ObjetoVisual, SalidaVisual, EventoTrampa
 from vista_pygame.render.panel_inventario import PanelInventario
 from vista_pygame.render.heroe_equipo import clave_equipo
 from vista_pygame.render.iluminacion_sala import IluminacionSala

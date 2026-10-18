@@ -13,7 +13,7 @@ from controlador.inicio_partida import nueva_partida
 from herramientas.generar_cripta_prueba import generar
 from bench.ciclo import PuertoMedicion, ejecutar_intervalo
 from controlador.controlador_juego import ControladorJuego
-from vista_pygame.controlador_pygame import ActorVisual, EstadoPartida, SalidaVisual
+from controlador.controlador_pygame import ActorVisual, EstadoPartida, SalidaVisual
 from vista_pygame.render.render_actores import dibujar_enemigos, dibujar_jugador
 from vista_pygame.render.render_sala import dibujar_sala
 from vista_pygame.stubs_temporales import CargadorAssetsTemporal

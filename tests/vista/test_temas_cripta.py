@@ -9,7 +9,7 @@ from vista_pygame.render.entrada_cripta import EntradaCripta
 from vista_pygame.render.victoria_cripta import SalidaCripta
 from vista_pygame.render.escenografia_sala import dibujar_escenario
 from vista_pygame.render.cinematica_trampa import EfectoTrampa
-from vista_pygame.controlador_pygame import SalidaVisual,ControladorPygame
+from controlador.controlador_pygame import SalidaVisual,ControladorPygame
 
 
 @pytest.mark.parametrize('numero',range(1,5))

@@ -4,7 +4,7 @@ import time
 import pygame
 import pytest
 
-from vista_pygame.controlador_pygame import ObjetoVisual
+from controlador.controlador_pygame import ObjetoVisual
 from vista_pygame.render.panel_inventario import PanelInventario
 
 

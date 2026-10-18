@@ -12,7 +12,7 @@ from vista_pygame.config_vista import (
     ALTO_LOGICO, ANCHO_LOGICO, CANTIDAD_ESCENAS, ESCENA_FIN_PARTIDA, ESCENA_INVENTARIO,
     ESCENA_MENU, ESCENA_PARTIDA, ESCENA_PAUSA, FPS_OBJETIVO, TITULO_VENTANA,
 )
-from vista_pygame.controlador_pygame import ControladorPygame
+from controlador.controlador_pygame import ControladorPygame
 from vista_pygame.recursos.cargador_assets import CargadorAssets
 from vista_pygame.escenas.inicio import EscenaInicio
 from vista_pygame.escenas.partida import EscenaPartida
@@ -170,8 +170,12 @@ class AppPygame:
             # Cierre ordenado: pide salir y espera (join) a que el hilo de
             # modelo termine de verdad, nunca lo abandona a medias.
             try:
+                self._contexto.controlador.cancelar_red()
                 if self._contexto._hilo_inicio is not None:
                     self._contexto._hilo_inicio.join()
+                consulta = getattr(self._escenas[ESCENA_MENU], '_hilo_carga', None)
+                if consulta is not None:
+                    consulta.join()
                 self._contexto.controlador.salir()
             finally:
                 pygame.quit()
