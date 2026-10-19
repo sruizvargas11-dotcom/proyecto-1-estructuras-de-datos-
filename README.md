@@ -1,6 +1,6 @@
 # CRIPTA
 
-CRIPTA es un juego de exploración por consola desarrollado para el curso de Estructuras de Datos II. El jugador recorre salas, combate enemigos, recoge objetos y busca la salida de una cripta. Cada acción tiene un costo de tiempo, y un reloj virtual organiza los turnos de los actores y los efectos del entorno.
+CRIPTA es un juego de exploración por consola desarrollado para el curso de Estructuras de Datos. El jugador recorre salas, combate enemigos, recoge objetos y busca la salida de una cripta. Cada acción tiene un costo de tiempo, y un reloj virtual organiza los turnos de los actores y los efectos del entorno.
 
 El proyecto utiliza estructuras de datos propias para resolver problemas del juego: una agenda de eventos con heap mínimo, un inventario con lista doble, una caché LRU para el catálogo y un historial de cambios que permite deshacer acciones. Puede obtener los datos desde un servicio HTTP o trabajar con los archivos locales incluidos en el repositorio.
 
